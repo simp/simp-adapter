@@ -32,4 +32,3 @@ env:
   - PUPPET_VERSION="~> 4.7.0"
 matrix:
   fast_finish: true
-

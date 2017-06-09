@@ -2,8 +2,8 @@
 .yardoc
 dist
 /pkg
-spec/rp_env
 /spec/fixtures
+/spec/rp_env
 !/spec/hieradata/default.yaml
 !/spec/fixtures/site.pp
 !/spec/fixtures/stub_modules/
@@ -16,3 +16,4 @@ spec/rp_env
 /vendor
 /junit
 /log
+/doc
