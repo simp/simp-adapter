@@ -2,7 +2,7 @@
 
 Summary: SIMP Adapter for the AIO Puppet Installation
 Name: simp-adapter
-Version: 0.0.3
+Version: 0.0.4
 Release: 0%{?dist}
 License: Apache-2.0
 Group: Applications/System
