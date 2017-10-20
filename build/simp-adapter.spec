@@ -2,7 +2,7 @@
 
 Summary: SIMP Adapter for the AIO Puppet Installation
 Name: simp-adapter
-Version: 0.0.4
+Version: 0.0.5
 Release: 0%{?dist}
 License: Apache-2.0
 Group: Applications/System
@@ -278,7 +278,10 @@ EOM
 )
 
 %changelog
-* Wed May 22 2017 Nick Miller <nick.miller@onyxpoint.com> - 0.0.4-0
+* Fri Oct 20 2017 Trevor Vaughan <tvaughan@onyxpoint.com> - 0.0.5-0
+- Fixed the Changelog dates
+
+* Mon May 22 2017 Nick Miller <nick.miller@onyxpoint.com> - 0.0.4-0
 - Removed packaged auth.conf in favor of managing it with Puppet
 
 * Wed Mar 08 2017 Trevor Vaughan <tvaughan@onyxpont.com> - 0.0.3-0
