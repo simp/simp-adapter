@@ -2,7 +2,7 @@
 
 Summary: SIMP Adapter for the AIO Puppet Installation
 Name: simp-adapter
-Version: 0.0.5
+Version: 0.0.6
 Release: 0%{?dist}
 License: Apache-2.0
 Group: Applications/System
@@ -40,12 +40,12 @@ Requires(post): pe-puppetserver
 Requires(post): pe-puppetdb
 %{?el6:Requires(post): procps}
 %{?el7:Requires(post): procps-ng}
-Requires: puppet-agent < 2.0.0
+Requires: puppet-agent < 6.0.0
 Requires: puppet-agent >= 1.6.2
 Requires: pe-client-tools >= 15.0.0
-Requires: pe-puppetdb < 5.0.0
+Requires: pe-puppetdb < 6.0.0
 Requires: pe-puppetdb >= 4.2.2
-Requires: pe-puppetdb-termini < 5.0.0
+Requires: pe-puppetdb-termini < 6.0.0
 Requires: pe-puppetdb-termini >= 4.2.2
 Requires: pe-puppetserver >= 2015.0.0
 Provides: simp-adapter = %{version}
@@ -278,6 +278,9 @@ EOM
 )
 
 %changelog
+* Wed Nov 08 2017 Nick Markowski <nicholas.markowski@onyxpoint.com> - 0.0.6-0
+- Updated pe dependencies for puppet 5.
+
 * Fri Oct 20 2017 Trevor Vaughan <tvaughan@onyxpoint.com> - 0.0.5-0
 - Fixed the Changelog dates
 
