@@ -18,6 +18,8 @@ script:
 - bundle exec rake metadata_lint
 - bundle exec rake lint
 - bundle exec rake spec
+- bundle exec rake pkg:compare_latest_tag
+- bundle exec rake pkg:create_tag_changelog
 notifications:
   email: false
 rvm:

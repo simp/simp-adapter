@@ -278,6 +278,12 @@ EOM
 )
 
 %changelog
+* Fri May 11 2018 Trevor Vaughan <tvaughan@onyxpoint.com> - 0.0.6-0
+- Updated the minimum version of the puppet-agent dependency to at least
+  1.10.4 (packages puppet 4.10.4), due to 'puppet generate types' bugs
+  in puppet-agent releases prior to that. These bugs cause the composite
+  namevar fixes to not function properly.
+
 * Fri Oct 20 2017 Trevor Vaughan <tvaughan@onyxpoint.com> - 0.0.5-0
 - Fixed the Changelog dates
 
