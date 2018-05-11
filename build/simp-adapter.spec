@@ -2,7 +2,7 @@
 
 Summary: SIMP Adapter for the AIO Puppet Installation
 Name: simp-adapter
-Version: 0.0.5
+Version: 0.0.6
 Release: 0%{?dist}
 License: Apache-2.0
 Group: Applications/System
@@ -19,7 +19,7 @@ Requires(post): puppetdb
 %{?el6:Requires(post): procps}
 %{?el7:Requires(post): procps-ng}
 Requires: puppet-agent < 2.0.0
-Requires: puppet-agent >= 1.6.2
+Requires: puppet-agent >= 1.10.4
 Requires: puppet-client-tools < 2.0.0
 Requires: puppet-client-tools >= 1.1.0
 Requires: puppetdb < 5.0.0
@@ -41,7 +41,7 @@ Requires(post): pe-puppetdb
 %{?el6:Requires(post): procps}
 %{?el7:Requires(post): procps-ng}
 Requires: puppet-agent < 2.0.0
-Requires: puppet-agent >= 1.6.2
+Requires: puppet-agent >= 1.10.4
 Requires: pe-client-tools >= 15.0.0
 Requires: pe-puppetdb < 5.0.0
 Requires: pe-puppetdb >= 4.2.2
@@ -278,6 +278,12 @@ EOM
 )
 
 %changelog
+* Fri May 11 2018 Trevor Vaughan <tvaughan@onyxpoint.com> - 0.0.6-0
+- Updated the minimum version of the puppet-agent dependency to at least
+  1.10.4 (packages puppet 4.10.4), due to 'puppet generate types' bugs
+  in puppet-agent releases prior to that. These bugs cause the composite
+  namevar fixes to not function properly.
+
 * Fri Oct 20 2017 Trevor Vaughan <tvaughan@onyxpoint.com> - 0.0.5-0
 - Fixed the Changelog dates
 
