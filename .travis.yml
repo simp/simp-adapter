@@ -34,7 +34,7 @@ jobs:
       deploy:
         - provider: releases
           api_key:
-              secure: "INSERTVALIDKEYHEREPLEASE"
+              secure: "iDqlp0aodfNFl0ItK1jf07hN+z9EsuK39loAN/qfXfs/0bnWIByiAHwEefOQoBxzEVdjoFmnOw36SG3qGTgXwbOWQQE3s17yh6S6J6uLMt5WKcuUVL3cNgUtngeam8Eva/beC7BG2kqQB6rIVJpp0iodlhmbT5afnCiJUuNhR8LZdf8DDAs7fulwUmi/mS9Pv2DthLE0BdPBa7iGHI4UxQz0B/evyCKvDCx7BQSYy3NQl4uBA4eGhuJF8EhazBXK0Px82RRqIsKWOkFvP3fOgxBtvf5r3BL/2rzpuEDFjGfbVvmaAvQQyShGSCDoz01h97bcASqQiYrHO6DRTH219I6TLFPyENXtFRIUBFRE7SAw95md81mNoSVsasXtUbghz4HJspOqAYXGJ0zT/lUqVRbQq62/fkOe9+Y5B4eYRTKKxia5J8+pvS33Vadld8f0o2i858bmpaaX7tk0tzLKdtJ44o7ORnIeNxoa1Z9c+QsGvjVFRDLPzWTbcCugECIlRNKHrecTBrA9bOVMtx/03ZaPcFWhMTESHy2tKKlUdYfQT4CgUifklzvm8gcSeZ8TOoKylD9i3EkztJUi9eMFx6h5Kshf6yNfTzmZYoY8dFvRjjBiRhtC3SeY+miwBsOYUq5pchRgkKV1kxENEpecRwL8wySJmzZ+x89IKQMwKT8="
           skip_cleanup: true
           on:
             tags: true
