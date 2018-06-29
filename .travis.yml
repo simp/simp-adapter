@@ -19,9 +19,23 @@ before_install:
 jobs:
   include:
     - stage: check
-      rvm: 2.1.9
+      rvm: 2.4.1
       script:
-        - bundle exec rake metadata_lint
-        - bundle exec rake lint
         - bundle exec rake pkg:compare_latest_tag
         - bundle exec rake pkg:create_tag_changelog
+
+    - stage: deploy
+      rvm: 2.4.1
+      script:
+        - true
+      before_deploy:
+        - "export SPECFILE_VERSION=`rpm -q --specfile build/*.spec --queryformat '%{VERSION}'`"
+        - '[[ $TRAVIS_TAG =~ ^${SPECFILE_VERSION}$ ]]'
+      deploy:
+        - provider: releases
+          api_key:
+              secure: "INSERTVALIDKEYHEREPLEASE"
+          skip_cleanup: true
+          on:
+            tags: true
+            condition: '($SKIP_PUBLISH != true)'
