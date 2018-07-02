@@ -29,7 +29,7 @@ jobs:
       script:
         - true
       before_deploy:
-        - "export SPECFILE_VERSION=`rpm -q --specfile build/*.spec --queryformat '%{VERSION}'`"
+        - "export SPECFILE_VERSION=`rpm -q --specfile build/*.spec --queryformat '%{VERSION}\n' | head -1`"
         - '[[ $TRAVIS_TAG =~ ^${SPECFILE_VERSION}$ ]]'
       deploy:
         - provider: releases
