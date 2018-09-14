@@ -41,13 +41,13 @@ Requires(post): pe-puppetdb
 %{?el6:Requires(post): procps}
 %{?el7:Requires(post): procps-ng}
 Requires: puppet-agent < 6.0.0
-Requires: puppet-agent >= 5.3.5
-Requires: pe-client-tools >= 15.0.0
+Requires: puppet-agent >= 5.5.6
+Requires: pe-client-tools >= 18.0.0
 Requires: pe-puppetdb < 6.0.0
 Requires: pe-puppetdb >= 5.2.4
 Requires: pe-puppetdb-termini < 6.0.0
-Requires: pe-puppetdb-termini >= 4.2.2
-Requires: pe-puppetserver >= 2015.0.0
+Requires: pe-puppetdb-termini >= 5.2.4
+Requires: pe-puppetserver >= 2018.1.0
 Provides: simp-adapter = %{version}
 Provides: simp-adapter-pe = %{version}
 
