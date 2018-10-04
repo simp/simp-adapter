@@ -3,38 +3,69 @@ require 'spec_helper_acceptance'
 test_name 'simp-adapter'
 
 describe 'simp-adapter' do
-  specify do
-    rpm_src        = File.join(fixtures_path,'dist')
-    stub_rpm_src   = File.join(fixtures_path,'test_module_rpms')
-    local_yum_repo = '/srv/local_yum'
-    _parallel      = {:run_in_parallel => true}
+  let(:local_yum_repo) {'/srv/local_yum' }
 
-    step '[prep] Install OS packages'
-    packages = ['git','createrepo','yum-utils']
-    #packages.each{|pkg| on(hosts, puppet_resource('package', pkg, 'ensure=installed'), _parallel)}
-    _cmd = packages.map{|pkg| puppet_resource('package',pkg,'ensure=installed')}.join('&&')
-    _cmd = packages.map{|pkg| "puppet resource package #{pkg} ensure=installed" }.join(' && ')
-    on(hosts,_cmd,_parallel)
+  context 'Initial test prep on each host' do
+    specify do
+      step '[prep] Install OS packages'
+      yum_packages = ['createrepo','yum-utils']
+      cmd = yum_packages.map{|pkg| "puppet resource package #{pkg} ensure=installed" }.join(' && ')
+      on(hosts,cmd)
 
-    step '[prep] Set up git on hosts'
-    on(hosts,'git config --global user.email "root@rooty.tooty"', _parallel)
-    on(hosts,'git config --global user.name "Rootlike Overlord"', _parallel)
+      rpm_build_packages = [ 'openssl', 'git', 'rpm-build', 'gnupg2', 'libicu-devel',
+        'libxml2', 'libxml2-devel', 'libxslt', 'libxslt-devel', 'rpmdevtools',
+        'ruby-devel',
+      ]
+      cmd = rpm_build_packages.map{|pkg| "puppet resource package #{pkg} ensure=installed" }.join(' && ')
+      on(hosts,cmd)
 
-    step '[prep] Put the RPMs in a local repo'
-    on(hosts, "mkdir -p #{local_yum_repo}", _parallel)
-    hosts.each do |host|
-      Bundler.with_clean_env do
-        %x{rake clean}
-        %x{rake pkg:rpm[#{host[:mock_chroot]},true]}
+      gem_build_packages = ['libyaml-devel', 'glibc-headers', 'autoconf', 'gcc',
+        'gcc-c++', 'glibc-devel', 'readline-devel', 'libffi-devel',
+        'openssl-devel', 'automake', 'libtool', 'bison', 'sqlite-devel', 'tar',
+        'patch'
+      ]
+      cmd = gem_build_packages.map{|pkg| "puppet resource package #{pkg} ensure=installed" }.join(' && ')
+      on(hosts,cmd)
+
+      step '[prep] Copy pre-built test RPMs to hosts'
+      on(hosts, "mkdir -p #{local_yum_repo}")
+      stub_rpm_src   = File.join(fixtures_path,'test_module_rpms')
+      src_rpms = Dir.glob(File.join(stub_rpm_src,'*.rpm'))
+      hosts.each do |host|
+        src_rpms.each{|rpm| scp_to(host, rpm, local_yum_repo) }
       end
-      src_rpms = []
-      src_rpms += Dir.glob(File.join(rpm_src,host[:rpm_glob]))
-      src_rpms += Dir.glob(File.join(stub_rpm_src,'*.rpm'))
-      src_rpms.each{|rpm| scp_to(host, rpm, local_yum_repo, _parallel)}
     end
 
-    step '[prep] Create a local yum repo'
-    local_yum_repo_conf = <<-EOM
+    specify do
+      step '[prep] Create build_user that has a simp-adapter project directory'
+      # Allow the build user to perform privileged operations, so if the package
+      # list is incomplete during rvm install, it will install packages via sudo
+      # and fix the problem automatically
+      on(hosts,"echo 'Defaults:build_user !requiretty' >> /etc/sudoers")
+      on(hosts,"echo 'build_user ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers")
+      on(hosts,'useradd -b /home -m -c "Build User" -s /bin/bash -U build_user')
+
+      # Move simp-adapter files that were deployed as if they were a puppet module
+      # (via .fixtures.yaml) to build_user's home dir
+      on(hosts,'mv /etc/puppetlabs/code/environments/production/modules/simp-adapter /home/build_user')
+      on(hosts,'chown -R build_user:build_user /home/build_user/simp-adapter')
+
+      step '[prep] Install rvm for build_user'
+      on(hosts,'runuser build_user -l -c "gpg2 --keyserver hkp://keys.gnupg.net --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3"')
+      on(hosts,'runuser build_user -l -c "curl -sSL https://get.rvm.io | bash -s stable"')
+      on(hosts,'runuser build_user -l -c "rvm install 2.4.4"')
+      on(hosts,'runuser build_user -l -c "rvm use --default 2.4.4"')
+      on(hosts,'runuser build_user -l -c "rvm all do gem install bundler --no-ri --no-rdoc"')
+
+      step '[prep] Build simp-adapter RPM'
+      on(hosts,'runuser build_user -l -c "cd simp-adapter; git init"') # git project required for pkg:rpm
+      on(hosts,'runuser build_user -l -c "cd simp-adapter; bundle update; bundle exec rake clean"')
+      on(hosts,'runuser build_user -l -c "cd simp-adapter; bundle exec rake pkg:rpm"')
+    end
+
+    specify do
+      step '[prep] Create a local yum repo'
+      local_yum_repo_conf = <<-EOM
 [local_yum]
 name=Local Repos
 baseurl=file://#{local_yum_repo}
@@ -42,9 +73,14 @@ enabled=1
 gpgcheck=0
 repo_gpgcheck=0
     EOM
-    _parallel = {}
-    on(hosts, "cd #{local_yum_repo} && createrepo .", _parallel)
-    create_remote_file(hosts, '/etc/yum.repos.d/beaker_local.repo', local_yum_repo_conf, _parallel)
+
+      rpm_src = '/home/build_user/simp-adapter/dist'
+      hosts.each do |host|
+        on(host, "cp #{rpm_src}/#{host[:rpm_glob]} #{local_yum_repo}")
+      end
+      on(hosts, "cd #{local_yum_repo} && createrepo .")
+      create_remote_file(hosts, '/etc/yum.repos.d/beaker_local.repo', local_yum_repo_conf)
+    end
   end
 
   hosts.each do |host|
@@ -115,34 +151,40 @@ this_should_not_break_things : awwww_yeah
           ).to match(%r{Just testing stuff})
         end
 
-      it 'should uninstall cleanly' do
-        host.uninstall_package('pupmod-simp-beakertest')
-        host.uninstall_package('simp-environment')
-        host.uninstall_package('simp-adapter')
-        on(host, 'test ! -d /usr/share/simp/modules/beakertest')
-        on(host, "test ! -d #{install_target}/environments/simp/modules/beakertest")
-        on(host, "test ! -f #{install_target}/environments/simp/test_file")
-      end
+        it 'should uninstall cleanly' do
+          host.uninstall_package('pupmod-simp-beakertest')
+          host.uninstall_package('simp-environment')
+          host.uninstall_package('simp-adapter')
+          on(host, 'test ! -d /usr/share/simp/modules/beakertest')
+          on(host, "test ! -d #{install_target}/environments/simp/modules/beakertest")
+          on(host, "test ! -f #{install_target}/environments/simp/test_file")
+        end
 
-      it 'should not remove local module files upon module uninstall' do
-        config_yaml =<<-EOM
+        it 'should not remove local module files upon module uninstall' do
+          config_yaml =<<-EOM
 ---
 copy_rpm_data : true
         EOM
-        create_remote_file(host, '/etc/simp/adapter_config.yaml', config_yaml)
-        host.install_package('pupmod-simp-beakertest')
-        on(host, "echo 'this module is great' > #{install_target}/environments/simp/modules/beakertest/NOTES.txt")
-        host.uninstall_package('pupmod-simp-beakertest')
-        host.uninstall_package('simp-adapter')
-        on(host, "test -d #{install_target}/environments/simp/modules/beakertest")
-        on(host, "test -f #{install_target}/environments/simp/modules/beakertest/NOTES.txt")
-        expect(
+          create_remote_file(host, '/etc/simp/adapter_config.yaml', config_yaml)
+          host.install_package('pupmod-simp-beakertest')
+          on(host, "echo 'this module is great' > #{install_target}/environments/simp/modules/beakertest/NOTES.txt")
+          host.uninstall_package('pupmod-simp-beakertest')
+          host.uninstall_package('simp-adapter')
+          on(host, "test -d #{install_target}/environments/simp/modules/beakertest")
+          on(host, "test -f #{install_target}/environments/simp/modules/beakertest/NOTES.txt")
+          expect(
           on(host, "find #{install_target}/environments/simp/modules/beakertest | wc -l").output
-        ).to eq "2\n"
+          ).to eq "2\n"
+        end
       end
-    end
 
       context "Installing with an already-managed target" do
+        specify do
+          step '[prep] Set up git in simp environment on hosts'
+          on(hosts,'git config --global user.email "root@rooty.tooty"')
+          on(hosts,'git config --global user.name "Rootlike Overlord"')
+        end
+
         it 'should have a git-managed beakertest module' do
           host.mkdir_p("#{install_target}/environments/simp/modules/beakertest")
           create_remote_file(host, "#{install_target}/environments/simp/modules/beakertest/test_file", '# IMA TEST')

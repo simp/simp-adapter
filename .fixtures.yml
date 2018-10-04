@@ -1,7 +1,7 @@
 ---
 fixtures:
   symlinks:
-    # This is just needed for the test framework
-    garbage: "#{source_dir}/spec/fixtures/stub_modules/garbage"
-    '../dist': "#{source_dir}/dist"
-
+    # Lazy way to get the project source code onto each host for
+    # building RPMs in acceptance tests.  Within the tests, we'll
+    # relocate to a more appropriate directory.
+    simp-adapter: "#{source_dir}"

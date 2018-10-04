@@ -6,13 +6,11 @@ HOSTS:
     platform:   el-7-x86_64
     hypervisor: vagrant
     box: centos/7
-    mock_chroot: epel-7-x86_64
 
   el6:
     platform:   el-6-x86_64
     hypervisor: vagrant
     box: centos/6
-    mock_chroot: epel-6-x86_64
 
 CONFIG:
   rpm_glob: 'simp-adapter-[0-9]*rpm'
@@ -20,3 +18,5 @@ CONFIG:
   type: aio
   vagrant_memsize: 256
   synced_folder: disabled
+# The simp-adapter is hardcoded to require Puppet 5
+  puppet_collection: puppet5
