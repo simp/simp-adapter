@@ -316,8 +316,13 @@ puppet config set stringify_facts false || :
   cd %{puppet_confdir}
 
   if [ -f "hiera.yaml.simp.rpm_upgrade_bak" ]; then
-    # Restore the saved off Hiera 3 'hiera.yaml.simp'
-    mv  hiera.yaml.simp.rpm_upgrade_bak hiera.yaml.simp
+    if [ -e "hiera.yaml.simp" ]; then
+      # Backup was not necessary
+      rm  hiera.yaml.simp.rpm_upgrade_bak
+    else
+      # Restore the saved off Hiera 3 'hiera.yaml.simp'
+      mv  hiera.yaml.simp.rpm_upgrade_bak hiera.yaml.simp
+    fi
   fi
 
   if [ -h "hiera.yaml.pkg-old" ] &&  [ "$(readlink hiera.yaml.pkg-old)" = "hiera.yaml.simp" ]  && [ -e "hiera.yaml.simp" ]; then
