@@ -244,9 +244,7 @@ if [ "${puppet_user}" == 'puppet' ]; then
 fi
 # End Puppet Open Source permissions munging
 
-puppet config set trusted_node_data true || :
 puppet config set digest_algorithm sha256 || :
-puppet config set stringify_facts false || :
 
 (
   cd %{puppet_confdir}
@@ -349,6 +347,8 @@ puppet config set stringify_facts false || :
 - Added uninstall logic to remove an existing hiera.yaml.simp file that had
   been preserved from simp-adapter <= 0.0.6, but which is no longer in the
   simp-adapter RPM file list.
+- Removed enabling OBE puppet trusted_node_data setting in %post
+- Removed disabling OBE puppet stringify_facts setting in %post
 
 * Fri Sep 07 2018 Jeanne Greulich <jeanne.greulich@onyxpoint.com> - 0.1.0-0
 - Updated to use puppet 5 for SIMP 6.3
