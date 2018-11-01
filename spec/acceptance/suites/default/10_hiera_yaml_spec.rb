@@ -12,8 +12,7 @@ describe 'simp-adapter hiera.yaml ops' do
 
   specify do
     step '[prep] Configure yum for SIMP PackageCloud repos'
-    on(hosts, "curl -s https://packagecloud.io/install/repositories/simp-project/6_X/script.rpm.sh | bash")
-    on(hosts, "curl -s https://packagecloud.io/install/repositories/simp-project/6_X_Dependencies/script.rpm.sh | bash")
+    hosts.each { |host| set_up_simp_repos(host) }
     on(hosts, "yum clean all; yum makecache")
   end
 

@@ -11,12 +11,12 @@ HOSTS:
       - server
       - default
     platform:   el-7-x86_64
-    box: centos/7
+    box: onyxpoint/oel-7-x86_64
     hypervisor: <%= hypervisor %>
 
   el6:
     platform:   el-6-x86_64
-    box: centos/6
+    box: onyxpoint/oel-6-x86_64
     hypervisor: <%= hypervisor %>
 
 CONFIG:
