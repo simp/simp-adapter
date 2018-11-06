@@ -150,32 +150,34 @@ sanity_checks:
   <<: *setup_bundler_env
   stage: 'sanity'
   tags: ['docker']
+# The puppet gem is used by one of the scripts in this
+# project, but puppet module checks are inapplicable  
   script:
     - 'if `hash apt-get`; then apt-get update; fi'
     - 'if `hash apt-get`; then apt-get install -y rpm; fi'
-    - 'bundle exec rake check:dot_underscore'
-    - 'bundle exec rake check:test_file'
-    - 'bundle exec rake pkg:check_version'
+#    - 'bundle exec rake check:dot_underscore'
+#    - 'bundle exec rake check:test_file'
+#    - 'bundle exec rake pkg:check_version'
     - 'bundle exec rake pkg:compare_latest_tag'
     - 'bundle exec rake pkg:create_tag_changelog'
-    - 'bundle exec puppet module build'
+#    - 'bundle exec puppet module build'
 
 # Linting
 #-----------------------------------------------------------------------
+# puppet module lint checks are inapplicable
+#pup4-lint:
+#  <<: *pup_4_10
+#  <<: *lint_tests
+#
+#pup5-lint:
+#  <<: *pup_5
+#  <<: *lint_tests
+#
+#pup6-lint:
+#  <<: *pup_6
+#  <<: *lint_tests
 
-pup4-lint:
-  <<: *pup_4_10
-  <<: *lint_tests
-
-pup5-lint:
-  <<: *pup_5
-  <<: *lint_tests
-
-pup6-lint:
-  <<: *pup_6
-  <<: *lint_tests
-
-# Unit Tests
+# No Unit Tests
 #-----------------------------------------------------------------------
 # simp-adapter has not spec tests at this time.
 #
@@ -201,8 +203,8 @@ pup6-lint:
 #
 # Acceptance Tests
 #-----------------------------------------------------------------------
-#  simp-adapter is hardcode to puppet 5
-#  acceptance tests outside puppet 5 won't work at this time
+# simp-adapter RPM requires Puppet 5, so no
+# need to test on earlier Puppet versions
 #
 #pup4.10:
 #  <<: *pup_4_10
