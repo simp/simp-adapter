@@ -12,6 +12,13 @@ describe 'simp-adapter' do
       cmd = yum_packages.map{|pkg| "puppet resource package #{pkg} ensure=installed" }.join(' && ')
       on(hosts,cmd)
 
+      result = on(hosts[0], 'cat /etc/oracle-release', :accept_all_exit_codes => true)
+      if result.exit_code == 0
+        # problem with OEL repos...need optional repos enabled in order
+        # for all the rvm build dependencies to resolve
+        on(hosts, 'yum-config-manager --enable ol7_optional_latest')
+      end
+
       rpm_build_packages = [ 'openssl', 'git', 'rpm-build', 'gnupg2', 'libicu-devel',
         'libxml2', 'libxml2-devel', 'libxslt', 'libxslt-devel', 'rpmdevtools',
         'ruby-devel',
