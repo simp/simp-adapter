@@ -177,30 +177,30 @@ sanity_checks:
 #  <<: *pup_6
 #  <<: *lint_tests
 
-# No Unit Tests
 #-----------------------------------------------------------------------
-# simp-adapter has not spec tests at this time.
 #
+# simp-adapter RPM requires Puppet 5, so no
+# need to test on earlier Puppet versions
 #pup4.10-unit:
 #  <<: *pup_4_10
 #  <<: *unit_tests
-#
-#pup5-unit:
-#  <<: *pup_5
-#  <<: *unit_tests
-#
-#pup5_3-unit:
-#  <<: *pup_5_3
-#  <<: *unit_tests
-#
-#pup5.5.7-unit:
-#  <<: *pup_5_5_7
-#  <<: *unit_tests
-#
-#pup6-unit:
-#  <<: *pup_6
-#  <<: *unit_tests
-#
+
+pup5-unit:
+  <<: *pup_5
+  <<: *unit_tests
+
+pup5_3-unit:
+  <<: *pup_5_3
+  <<: *unit_tests
+
+pup5.5.7-unit:
+  <<: *pup_5_5_7
+  <<: *unit_tests
+
+pup6-unit:
+  <<: *pup_6
+  <<: *unit_tests
+
 # Acceptance Tests
 #-----------------------------------------------------------------------
 # simp-adapter RPM requires Puppet 5, so no
@@ -223,13 +223,13 @@ pup5.5.7:
   <<: *pup_5_5_7
   <<: *acceptance_tests
   script:
-    - 'bundle exec rake beaker:suites'
+    - 'bundle exec rake beaker:suites[default]'
 
 pup5.5.7-fips:
   <<: *pup_5_5_7
   <<: *acceptance_tests
   script:
-    - 'BEAKER_fips=yes bundle exec rake beaker:suites'
+    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default]'
 
 pup5.5.7-oel:
   <<: *pup_5_5_7

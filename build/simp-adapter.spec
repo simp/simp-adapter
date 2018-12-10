@@ -2,7 +2,7 @@
 
 Summary: SIMP Adapter for the AIO Puppet Installation
 Name: simp-adapter
-Version: 0.1.0
+Version: 0.1.1
 Release: 0%{?dist}
 License: Apache-2.0
 Group: Applications/System
@@ -309,7 +309,7 @@ puppet config set digest_algorithm sha256 || :
 %posttrans
 # This strange but necessary logic is require to handle the second part of a
 # simp-adapter upgrade workaround initiated in %pre for a specific use case.
-  See %pre comments for details.
+# See %pre comments for details.
 (
   cd %{puppet_confdir}
 
@@ -340,6 +340,11 @@ puppet config set digest_algorithm sha256 || :
 )
 
 %changelog
+* Fri Dec 07 2018 Liz Nemsick <lnemsick.simp@gmail.com> -  0.1.1-0
+- Affect a copy with simp_rpm_helper when called in either the %posttrans
+  or %post of a SIMP RPM.
+- Fix bug in simp-adapter.spec in which a comment line was missing the '#'
+
 * Fri Oct 05 2018 Liz Nemsick <lnemsick.simp@gmail.com> -  0.1.0-0
 - Removed delivery of global, Hiera 3 hiera.yaml file.
 - Added logic to ensure any existing hiera.yaml.simp file is not removed

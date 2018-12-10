@@ -1,0 +1,6 @@
+pupmod-simp-beakertest-0.0.1 - SIMP 6 RPM with simp_rpm_helper in %post
+pupmod-simp-beakertest-0.0.2 - SIMP 6 RPM with simp_rpm_helper in %posttrans
+pupmod-simp-beakertest-0.0.3 - SIMP 6 RPM with simp_rpm_helper in %posttrans and
+   a directory difference from pupmod-simp-beakertest-0.0.2
+
+
