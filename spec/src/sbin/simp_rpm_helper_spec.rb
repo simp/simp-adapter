@@ -7,6 +7,11 @@ require 'simp_rpm_helper'
 #   tests/ directory to rename the file to a proper '.rb'.
 describe 'SimpRpmHelper' do
 
+  # usage has name simp_rpm_helper.rb, not simp_rpm_helper, because we are
+  # testing with a simp_rpm_helper.rb link.  We need this link in order to
+  # gather test code coverage with SimpleCov.
+  let(:script) { 'simp_rpm_helper.rb'}
+
   let(:mock_puppet_config) {
     <<-EOM
 user = puppet
@@ -16,24 +21,36 @@ codedir = /etc/puppetlabs/code/
   }
 
   let(:usage) {
-    # usage has name simp_rpm_helper.rb, not simp_rpm_helper, because we are
-    # testing with a simp_rpm_helper.rb link.  We need this link in order to
-    # gather test code coverage with SimpleCov.
     <<-EOM
-Usage: simp_rpm_helper.rb [options]
+Usage: #{script} -d DIR -s SECTION -S STATUS [options]
 
-        --rpm_dir PATH               The directory into which the RPM source material is installed
-        --rpm_section SECTION        The section of the RPM from which the script is being called.
-                                         Must be one of 'pre', 'preun', 'postun', 'posttrans'
-        --rpm_status STATUS          The status code passed to the RPM section
-    -f, --config CONFIG_FILE         The configuration file to use.
+    -d, --rpm_dir DIR                The fully qualified path to the directory
+                                     into which the module's RPM source material
+                                     is installed.
+    -s, --rpm_section SECTION        The section of the RPM from which the
+                                     script is being called: 'pre', 'preun'
+                                     'post', 'postun', 'posttrans'
+    -S, --rpm_status STATUS          The status code passed to the RPM section.
+                                     When --rpm_section is 'posttrans', should
+                                     be '2' for an upgrade and '1' for an
+                                     initial install.
+    -f, --config CONFIG_FILE         The configuration file overriding defaults.
                                          Default: /etc/simp/adapter_config.yaml
-    -p, --preserve                   Preserve material in 'target_dir' that is not in 'rpm_dir'
-    -e, --enforce                    If set, enforce the copy, regardless of the setting in the config file
-                                         Default: false
-    -t, --target_dir DIR             The subdirectory of /etc/puppetlabs/code/environments/
-                                     into which to copy the materials.
-                                         Default: simp/modules
+    -t, --target_dir DIR             The fully qualified path to the parent
+                                     directory of the module Git repository.
+                                     This repository will be created/updated
+                                     using materials found in --rpm_dir.
+                                         Default:
+                                         /usr/share/simp/git/puppet_modules
+    -w, --work_dir DIR               The fully qualified path for a temporary
+                                     work directory.
+                                         Default: /var/lib/simp-adapter/git
+    -a, --git_author AUTHOR          The (non-empty) author to use for commits
+                                     to the module Git repo.
+                                         Default: #{script}
+    -e, --git_email EMAIL            The email address to use for commits
+                                     to the module Git repo.
+                                         Default: root@#{`hostname -f`.strip}
     -v, --verbose                    Print out debug info when processing.
     -h, --help                       Help Message
     EOM
@@ -47,7 +64,8 @@ Usage: simp_rpm_helper.rb [options]
     context 'success cases' do
 
       it 'should print help' do
-        allow(@helper).to receive(:`).with('puppet config --section master print').and_return(mock_puppet_config)
+# TODO re-enable when R10k option is added to simp_rpm_helper
+#        allow(@helper).to receive(:`).with('puppet config --section master print').and_return(mock_puppet_config)
         expect{ @helper.run(['-h']) }.to output(usage).to_stdout
         expect( @helper.run(['-h']) ).to eq(0)
       end
@@ -56,11 +74,11 @@ Usage: simp_rpm_helper.rb [options]
     context 'error cases' do
       it 'should fail and print help with invalid option' do
         expected = <<-EOF
-Error: invalid option: -x
+#{script} ERROR: invalid option: -x
 
 #{usage.strip}
         EOF
-        allow(@helper).to receive(:`).with('puppet config --section master print').and_return(mock_puppet_config)
+#        allow(@helper).to receive(:`).with('puppet config --section master print').and_return(mock_puppet_config)
         expect{ @helper.run(['-x']) }.to output(expected).to_stderr
         expect( @helper.run(['-x']) ).to eq(1)
       end

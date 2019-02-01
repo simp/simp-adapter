@@ -68,7 +68,7 @@ variables:
 #-----------------------------------------------------------------------
 
 .pup_4: &pup_4
-  image: 'ruby:2.4'
+  image: 'ruby:2.1'
   variables:
     PUPPET_VERSION: '~> 4.0'
     MATRIX_RUBY_VERSION: '2.1'
@@ -151,7 +151,7 @@ sanity_checks:
   stage: 'sanity'
   tags: ['docker']
 # The puppet gem is used by one of the scripts in this
-# project, but puppet module checks are inapplicable  
+# project, but puppet module checks are inapplicable
   script:
     - 'if `hash apt-get`; then apt-get update; fi'
     - 'if `hash apt-get`; then apt-get install -y rpm; fi'

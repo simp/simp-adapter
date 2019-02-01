@@ -3,83 +3,298 @@
 # Purpose
 # -------
 #
-# This script is meant to be called by the %preun and %postttrans sections of
-# the various SIMP Puppet module RPMs.
+# simp_rpm_helper ensures that RPM-delivered, SIMP modules (which
+# are installed into /usr/share/simp/modules) are imported into
+# SIMP-managed, Git repositories.
 #
-# The purpose of the script is to provide helper methods that correctly
-# scaffold the system in such a way that all SIMP Puppet Modules can be
-# installed via RPM to a single location and subsequently can be copied into
-# the standard SIMP installation location based on the version of Puppet that
-# is installed.
+# When called during the %posttrans section (scriptlet) of the
+# an RPM install, upgrade, or downgrade, it does the following:
 #
-# Care is taken that, should the target directory be managed via 'git', this
-# script will do nothing to harm the managed installation in any way. This
-# ensures that the SIMP modules have maximum compatibility with the widest
-# possible range of Puppet module best practices for management while ensuring
-# that the RPM installations and upgrades can proceed in a seamless fashion
-# over time.
+# - Creates /usr/share/simp/git, if it does not exist
+# - Creates /usr/share/simp/git/puppet_modules, if it does not exist
+# - Creates a central (bare) Git repository for the module, if it
+#   does not exist
+#   - The repository is named using the 'name' field from
+#     its metadata.json file:
 #
-# Should the 'simp' environment not be found, the script will simply exit
-# without copying any files.
+#      /usr/share/simp/git/puppet_modules/<owner>-<name>.git
+#
+# - Updates the master branch of the repository to be the contents
+#   of the RPM, excluding any empty directories
+# - Adds a Git tag to the repository that matches the version number
+#   in the module's metadata.json file, as necessary
+#   - Overwrites the tag if it exists but doesn't match the contents
+#      of the RPM
+#
+# If called during any other RPM section, it does nothing to the
+# module's repository.  However, it does log important information
+# in two cases:
+# - If called during the %post section in an install or upgrade,
+#   (i.e., is called from an old, buggy SIMP RPM), it logs a message
+#   telling the user how to fix the problem by calling simp_rpm_helper
+#   with the correct arguments.
+# - If called during a %preun when the RPM status is 0, i.e., a RPM
+#   uninstall (erase), it logs a message telling the user that the
+#   module's git repo has been preserved. (We can't remove it,
+#   as we don't know if it is in use.)
 #
 # Configuration
 # -------------
 #
-# A configuration file may be placed at /etc/simp/adapter_config.yaml. The
-# file must consist of proper YAML as demonstrated in the example below which
-# lists the default options.
+# simp_rpm_helper can be configured via a YAML file, which, if not
+# specified in a command line option, defaults to
+#     /etc/simp/adapter_config.yaml.
 #
-# Any configuration options that are not understood will be ignored.
+# Below is an example of the configuration file that shows the default
+# options.  If any other configuration options are specified, for example,
+# those from older simp_rpm_helper versions, they will be ignored.
 #
 # ```yaml
 #   ---
 #   # Target directory
-#   # May be set to a fully qualified path or 'auto'
-#   # If set to 'auto', the directory will be determined from puppet itself
-#
-#   target_directory : 'auto'
-#
-#   # Copy the RPM data to the target directory
-#
-#   copy_rpm_data : false
-#
+#   #   The fully qualified path to the parent directory of the
+#   #   SIMP-managed, module Git repositories.
+#   #
+#   target_dir: /usr/share/simp/git/puppet_modules
+#   #
+#   # Work directory
+#   #    The fully qualified path for a temporary work directory used
+#   #    by simp_rpm_helper.
+#   #
+#   work_dir: /var/lib/simp-adapter/git
+#   #
+#   # Git Author
+#   #   The author to ascribe to each Git commit made by simp_rpm_helper,
+#   #   when it imports module materials from a module RPM into the
+#   #   module's repository.  Cannot be empty.
+#   #
+#   git_author: simp_rpm_helper
+#   #
+#   # Git Email
+#   #   The author's email to ascribe to each Git commit made by
+#   #   simp_rpm_helper, when it imports module materials from a module
+#   #   RPM into the module's repository.
+#   #
+#   git_email: root@<host's FQDN>
+#   #
+#   # Verbose
+#   #   Whether to turn on debug logging
+#   #
+#   verbose: false
 # ```
 #
 
 require 'facter'
 require 'fileutils'
-require 'yaml'
+require 'json'
 require 'optparse'
 require 'ostruct'
-require 'find'
+require 'securerandom'
+require 'yaml'
 
+=begin
+# TODO Re-enable this when the option to run R10K/CodeManager is added
 # Make sure we can find the Puppet executables
 ENV['PATH'] += ':/opt/puppetlabs/bin'
+=end
 
 class SimpRpmHelper
-  def initialize
-    @program_name = File.basename(__FILE__)
 
-    # A list of modules that should never be touched once installed
-    @safe_modules = ['site']
+  class ConfigError < StandardError ; end
+  class ComponentError < StandardError ; end
+  class CommandError < StandardError ; end
+
+  PROGRAM_NAME = File.basename(__FILE__)
+
+  #FIXME Would be best to pin this to the simp-adapter version in the spec file.
+  # - Add a custom version validator as a prerequisite to the Rake
+  #   pkg:check_rpm_changelog task?  We do with other assets that have
+  #   version info in Ruby code and RPM spec files...
+  VERSION = '1.0.0'
+
+  DEFAULT_CONFIG_FILE = '/etc/simp/adapter_config.yaml'
+  DEFAULT_BARE_REPOS_DIR = '/usr/share/simp/git/puppet_modules'
+  DEFAULT_WORK_DIR = '/var/lib/simp-adapter/git'
+
+  #FIXME? In an ISO install, the initial hostname for the SIMP server
+  # prior to user configuration will be 'puppet.change.me'.  This means
+  # the initial commit and tag for each module installed by the ISO
+  # will have a 'puppet.change.me' in its author and committer info...
+  # Will this be confusing to the user?
+  DEFAULT_GIT_AUTHOR = PROGRAM_NAME
+  DEFAULT_GIT_EMAIL = "root@#{`hostname -f`.strip}"
+
+  # key is --rpm_section, value is an array whose index corresponds
+  # to the integer representation of --rpm_status.  At each index
+  # is a human understandable interpretation of that status.
+  #
+  # For example, RPM_STATUS_MAP['pre'][1] means that this script
+  # is being called during the %pre section of an initial RPM
+  # installation, whereas, RPM_STATUS_MAP['pre'][2] means that this
+  # script is being called during the %pre section of an RPM upgrade.
+  #
+  # NOTE:  posttrans does **not** natively have a meaningful RPM status.
+  #        (Always set to 0). The status below comes from custom logic
+  #        in the RPM spec file template for modules that is provided by
+  #        simp-rake-helpers.
+  #
+  RPM_STATUS_MAP = {
+    'pre'       => [nil, 'install', 'upgrade'],
+    'post'      => [nil, 'install', 'upgrade'],
+    'posttrans' => [nil, 'install', 'upgrade'],
+    'preun'     => ['erase', 'uninstall previous version during upgrade', nil],
+    'postun'    => ['erase', 'uninstall previous version during upgrade', nil]
+  }
+
+  def initialize
+    @git = Facter::Core::Execution.which('git')
+    @rsync = Facter::Core::Execution.which('rsync')
+
+    # A list of modules(<author>-<name>) that should never be imported
+    # into the SIMP-managed bare repos and the reason each should be skipped.
+    # TODO Make this configurable?
+    @skip_components = {
+      'simp-site' => 'This is an empty module skeleton that belongs in a site-specific repo.',
+    }
+
+    # Variables to be set during processing
+    @options         = nil   # Merge of command line options, config file
+                             # settings and defaults
+    @module_fullname = nil   # <author>-<name> from metadata.json
+    @module_version  = nil   # version from metadata.json
+    @target_repo_dir = nil   # module's central (bare) repo to be created/updated
+    @repo_created    = false # whether the repo was created in this operation
+    @work_repo_dir   = nil   # temporary clone of the module's central repo; only
+                             # persists upon a git failure for developer debug
   end
 
-  def debug(msg)
-    # SIMP RPMs do not enable debug when they call this script.  So, if
-    # you want to debug an RPM problem with this script, comment out
-    # the line below.
-    return unless @options.debug
-    msg.split("\n").each do |line|
-      puts ">>>#{@program_name} DEBUG: #{line}"
+  # Clone the central repo for the component and update its master branch with
+  # the content in the RPM dir
+  #
+  # @raises SimpRpmHelper::CommandError if any git operation fails
+  def clone_and_update
+    # minimize the # of times we spew out the entire path to the git repo
+    repo = @repo_created ? 'master branch' : @target_repo_dir + ' master branch'
+    info("Updating #{repo} with version #{@module_version}")
+
+    debug("Cloning #{@target_repo_dir} to #{@work_repo_dir}")
+    # start clean
+    FileUtils.rm_rf(@work_repo_dir)
+    FileUtils.mkdir_p(File.dirname(@work_repo_dir))
+    execute("#{@git} clone file://#{@target_repo_dir} #{@work_repo_dir}",
+      "Failed to clone #{@target_repo_dir}")
+
+    Dir.chdir(@work_repo_dir) do
+      debug("Updating #{@work_repo_dir} with files from #{@options.rpm_dir}")
+      # clean out directory for an easy update
+      entries = Dir.entries(@work_repo_dir)
+      entries.delete_if { |entry| (entry == '.') or (entry == '..') or (entry == '.git') }
+      FileUtils.rm_rf(entries)
+
+      copy_cmd = %(#{@rsync} -a --force --exclude='.git' --delete)
+      copy_cmd += %( --verbose) if @options.verbose
+      copy_cmd += %( #{@options.rpm_dir}/ #{@work_repo_dir})
+      execute(copy_cmd, "Failed to update clone at #{@work_repo_dir}")
+
+      # double check a commit is required, because if the master branch
+      # already matches what we have, the commit will fail
+      results = execute("#{@git} status --porcelain")
+      if results[:stdout].strip.empty?
+        debug("Update of #{@target_repo_dir} master for #{@module_version} unnecessary")
+      else
+        debug("Updating master branch of #{@target_repo_dir}")
+        # -f option is required for files in spec/fixtures that don't play
+        # well with the .gitignore file (if packaged in the RPM)
+        execute("#{@git} add -f --all .",
+          "Failed to add updated content to #{@work_repo_dir}")
+
+        commit_cmd = [
+          "GIT_COMMITTER_NAME='#{@options.git_author}'",
+          "GIT_COMMITTER_EMAIL='#{@options.git_email}'",
+          "#{@git} commit",
+          "--author='#{@options.git_author} <#{@options.git_email}>'",
+          "-m 'Imported version #{@module_version}'"
+        ].join(' ')
+        execute(commit_cmd, "Failed to add updated content to #{@work_repo_dir}")
+
+        execute("#{@git} push origin master",
+          "Failed to push updated content to master at #{@target_repo_dir}")
+      end
     end
   end
 
-  def info(msg)
-    # When these messages get written out in an RPM upgrade, name of program
-    # is helpful to end user
-    puts "#{@program_name}: #{msg}"
+  # Create a bare repo for the module to act as a central repo
+  #
+  # @raises SimpRpmHelper::CommandError if the 'git --init' operation fails
+  def create_central_repo(target_repo_dir)
+    info("Creating central repo #{target_repo_dir}")
+    FileUtils.mkdir_p(File.dirname(target_repo_dir))
+
+    execute("#{@git} init --bare #{target_repo_dir}",
+      "Failed to create git repo at #{target_repo_dir}")
+
+    # git init --shared doesn't do what we need, so adjust the permissions
+    # manually
+    FileUtils.chmod_R('g=rX,o=rX', target_repo_dir)
+    @repo_created = true
   end
 
+  # Executes a command
+  # +cmd+::     Command to be executed
+  # +fail_msg:: Prefix to add to the failure message, if the command fails.
+  #
+  # @returns Hash with stdout output and stderr output if the command succeeds
+  # @raises SimpRpmHelper::CommandError if the command fails. The failure
+  #         message will include the exit code and any stderr output.
+  #
+  def execute(cmd, fail_msg = nil)
+    debug("Executing: #{cmd}")
+    outfile = File.join('/tmp', "#{ENV['USER']}_#{SecureRandom.hex}")
+    errfile = File.join('/tmp', "#{ENV['USER']}_#{SecureRandom.hex}")
+    pid = spawn(cmd, :out=>outfile, :err=>errfile)
+
+    begin
+      pid,status = Process.wait2(pid)
+    rescue Errno::ECHILD
+      # process exited before status could be determined
+    end
+
+    exit_status = status.nil? ? nil : status.exitstatus
+
+    if (exit_status == 0)
+      return { :stdout => IO.read(outfile), :stderr => IO.read(errfile) }
+    else
+      stderr = IO.read(errfile).strip
+      msg = fail_msg.nil? ? '' : "#{fail_msg}:\n"
+      msg += indent("[ #{cmd} ] returned #{exit_status}")
+      unless stderr.empty?
+        msg += ":\n"
+        msg += [ indent(">>>>>>>>>>>>> stderr >>>>>>>>>>>>>"),
+                 indent(stderr),
+                 indent("<<<<<<<<<<<<< stderr <<<<<<<<<<<<<")
+               ].join("\n")
+      end
+      raise SimpRpmHelper::CommandError.new(msg)
+    end
+  ensure
+    if @options.verbose
+      msg = []
+      msg << "Exit status: #{exit_status}"
+      msg << "-------- stdout --------"
+      stdout = File.read(outfile).strip
+      msg << indent(stdout) unless stdout.empty?
+      msg << "------------------------"
+      msg << "-------- stderr --------"
+      stderr = File.read(errfile).strip
+      msg << indent(stderr) unless stderr.empty?
+      msg << "------------------------"
+      debug(msg.join("\n"))
+    end
+    FileUtils.rm_f([outfile, errfile])
+  end
+
+=begin
+  # TODO Re-enable this when the option to run R10K/CodeManager is added
   # Get the Puppet configuration parameters currently in use
   def get_puppet_config
     system_config = %x{puppet config --section master print}
@@ -93,62 +308,99 @@ class SimpRpmHelper
 
     return config_hash
   end
+=end
 
-  # Determine whether the passed path is under management by git or svn
-  def is_managed?(path)
-    # Short circuit if the directory is not present
-    return false unless File.directory?(path)
+  def indent(message, indent_length=2)
+    message.split("\n").map {|line| ' '*indent_length + line }.join("\n")
+  end
 
-    git = Facter::Core::Execution.which('git')
-    svn = Facter::Core::Execution.which('svn')
+  # Update the master branch of the module's central Git repo
+  # with the contents in /usr/share/simp/modules/<module name> and
+  # then create a tag for that version.
+  #
+  # Creates the central Git repo if it does not exist.
+  #
+  # @raises SimpRpmHelper::CommandError if any git operation fails
+  def update_central_repo
+    debug("Processing install/version change for #{@module_fullname} #{@module_version}")
 
-    Dir.chdir(path) do
-      if git
-        %x{#{git} ls-files . --error-unmatch &> /dev/null}
+    create_central_repo(@target_repo_dir) unless Dir.exist?(@target_repo_dir)
+    clone_and_update
+    tag_version
+    info('Repo update completed.')
+  end
 
-        return true if $?.success?
-      end
-
-      if svn
-        %x{#{svn} info &> /dev/null}
-
-        return true if $?.success?
+  # Extract the module full name (<author>-<name>) and version from its
+  # metadata.json file
+  #
+  # @raises SimpRpmHelper::ComponentError if the metadata.json file does
+  #         not exist or fails to parse.
+  def load_module_info
+    metadata_file = File.join(@options.rpm_dir, 'metadata.json')
+    if File.exist?(metadata_file)
+      begin
+        metadata = JSON.load(File.read(metadata_file))
+        @module_fullname = metadata['name']
+        @module_version = metadata['version']
+      rescue Exception => e
+        error("Invalid file #{metadata_file}:\n#{e}")
       end
     end
 
-    return false
+    unless @module_fullname and @module_version
+      msg = "Could not extract module information from #{metadata_file}"
+      raise SimpRpmHelper::ComponentError.new(msg)
+    end
   end
 
+
+  # Parse and validate command line options
+  #
+  # Sets @cmd_line and initial @options settings based on the command line
+  #
+  # +args+: Array of command line arguments
+  #
+  # @raise Simp::Rpm::Helper::ConfigError on any option parsing/validation
+  #        failure
   def parse_options(args)
+    # save this off for warning/error messages
+    @cmd_line = "#{$0} #{args.join( ' ' )}"
 
     @options = OpenStruct.new
-    @options.config_file = '/etc/simp/adapter_config.yaml'
-    @options.preserve = false
 
     all_opts = OptionParser.new do |opts|
-      opts.banner = "Usage: #{@program_name} [options]"
-
+      opts.banner = "Usage: #{PROGRAM_NAME} -d DIR -s SECTION -S STATUS [options]"
       opts.separator ''
 
       opts.on(
-        '--rpm_dir PATH',
-        'The directory into which the RPM source material is installed'
+        '-d DIR',
+        '--rpm_dir DIR',
+        'The fully qualified path to the directory',
+        "into which the module's RPM source material",
+        'is installed.'
       ) do |arg|
         @options.rpm_dir = arg.strip
+        # Name of module, only.  Does not include the author.
         @options.module_name = File.basename(@options.rpm_dir)
       end
 
       opts.on(
+        '-s SECTION',
         '--rpm_section SECTION',
-        'The section of the RPM from which the script is being called.',
-        "    Must be one of 'pre', 'preun', 'postun', 'posttrans'"
+        'The section of the RPM from which the',
+        "script is being called: 'pre', 'preun'",
+        "'post', 'postun', 'posttrans'"
       ) do |arg|
         @options.rpm_section = arg.strip
       end
 
       opts.on(
+        '-S STATUS',
         '--rpm_status STATUS',
-        'The status code passed to the RPM section'
+        'The status code passed to the RPM section.',
+        "When --rpm_section is 'posttrans', should",
+        "be '2' for an upgrade and '1' for an",
+        'initial install.',
       ) do |arg|
         @options.rpm_status = arg.strip
       end
@@ -156,37 +408,54 @@ class SimpRpmHelper
       opts.on(
         '-f CONFIG_FILE',
         '--config CONFIG_FILE',
-        'The configuration file to use.',
-        "    Default: #{@options.config_file}"
+        'The configuration file overriding defaults.',
+        "    Default: #{DEFAULT_CONFIG_FILE}"
       ) do |arg|
         @options.config_file = arg.strip
       end
 
       opts.on(
-        '-p',
-        '--preserve',
-        "Preserve material in 'target_dir' that is not in 'rpm_dir'"
-      ) do |arg|
-        @options.preserve = true
-      end
-
-      opts.on(
-        '-e',
-        '--enforce',
-        'If set, enforce the copy, regardless of the setting in the config file',
-        '    Default: false'
-      ) do |arg|
-        @options.copy_rpm_data = true
-      end
-
-      opts.on(
         '-t DIR',
         '--target_dir DIR',
-        "The subdirectory of #{simp_target_dir('')}",
-        'into which to copy the materials.',
-        "    Default: #{simp_target_dir.gsub(/#{simp_target_dir('')}/,'')}"
+        'The fully qualified path to the parent',
+        'directory of the module Git repository.',
+        'This repository will be created/updated',
+        'using materials found in --rpm_dir.',
+        # 2 lines so help message fits into 80 characters
+        '    Default:',
+        "    #{DEFAULT_BARE_REPOS_DIR}"
       ) do |arg|
-        @options.target_dir = simp_target_dir(arg.strip)
+        @options.target_dir = arg.strip
+      end
+
+      opts.on(
+        '-w DIR',
+        '--work_dir DIR',
+        'The fully qualified path for a temporary',
+        'work directory.',
+        "    Default: #{DEFAULT_WORK_DIR}"
+      ) do |arg|
+        @options.work_dir = arg.strip
+      end
+
+      opts.on(
+        '-a AUTHOR',
+        '--git_author AUTHOR',
+        'The (non-empty) author to use for commits',
+        'to the module Git repo.',
+        "    Default: #{DEFAULT_GIT_AUTHOR}"
+      ) do |arg|
+        @options.git_author = arg.strip
+      end
+
+      opts.on(
+        '-e EMAIL',
+        '--git_email EMAIL',
+        'The email address to use for commits',
+        'to the module Git repo.',
+        "    Default: #{DEFAULT_GIT_EMAIL}"
+      ) do |arg|
+        @options.git_email = arg.strip
       end
 
       opts.on(
@@ -194,7 +463,7 @@ class SimpRpmHelper
         '--verbose',
         'Print out debug info when processing.'
       ) do
-        @options.debug = true
+        @options.verbose = true
       end
 
       opts.on(
@@ -210,21 +479,60 @@ class SimpRpmHelper
     begin
       all_opts.parse!(args)
     rescue OptionParser::ParseError => e
-      msg = "Error: #{e}\n\n#{all_opts}"
-      raise(msg)
+      raise SimpRpmHelper::ConfigError.new("#{e}\n\n#{all_opts}")
     end
 
     validate_options(all_opts.to_s)
   end
 
-  # Process the config, validate the entries and do some munging
-  # Sets @options hash.
-  def process_config
-    # Defaults
+  # A regular installation, upgrade or downgrade for an old SIMP
+  # RPM that erroneously calls this script in the %post instead
+  # of the %posttrans.
+  #
+  # This script can't copy the module content into a corresponding
+  # git repo in this case, because, if this is being called during an
+  # upgrade/downgrade and the old package has files that are not in
+  # the new package, the module content will be incorrect.  At this
+  # point in the RPM transaction, the source module content to be
+  # copied still contains the files that will be removed when the
+  # transaction completes.
+  #
+  # @raises SimpRpmHelper::ComponentError with a message explaining how to
+  #         manually execute this script to affect the copy into the
+  #         git repo
+  def handle_post_error
+    debug("Processing install/version change for #{@module_fullname} #{@module_version}")
+    msg = "#{@target_repo_dir} could not be updated to #{@module_version}\n\n"
+    msg += "          Manually execute the following to fix:\n\n"
+    msg += "#{@cmd_line.gsub("=post", "=posttrans")}\n\n"
+    raise SimpRpmHelper::ComponentError.new(msg)
+  end
+
+  # Load and validate configuration from a config file and then
+  # set defaults for options not specified on the command line
+  #
+  # Updates @options
+  #
+  # @raises SimpRpmHelper::ConfigError if a configuration file is specified
+  #    on the command line and it either does not exist or fails to parse.
+  #    Otherwise, raises if the default configuration file does exist but
+  #    fails to parse.
+  def process_config_file
+    # defaults
     config = {
-      'target_directory' => 'auto',
-      'copy_rpm_data'    => false
+      'git_author' => DEFAULT_GIT_AUTHOR,
+      'git_email'  => DEFAULT_GIT_EMAIL,
+      'target_dir' => DEFAULT_BARE_REPOS_DIR,
+      'work_dir'   => DEFAULT_WORK_DIR,
+      'verbose'    => false
     }
+
+    if @options.config_file
+      file_expected = true
+    else
+      file_expected = false
+      @options.config_file = DEFAULT_CONFIG_FILE
+    end
 
     if File.exist?(@options.config_file)
       begin
@@ -232,28 +540,52 @@ class SimpRpmHelper
         if system_config
           config.merge!(system_config)
         end
-      rescue
-        raise("Error: Config file '#{@options.config_file}' could not be processed")
+      rescue Exception => e
+        msg = "Config file '#{@options.config_file}' could not be processed:\n#{e}"
+        raise SimpRpmHelper::ConfigError.new(msg)
       end
+    elsif file_expected
+      msg = "Config file '#{@options.config_file}' does not exist"
+      raise SimpRpmHelper::ConfigError.new(msg)
     end
 
-    if @options.copy_rpm_data.nil?
-      @options.copy_rpm_data = (config['copy_rpm_data'].to_s == 'true')
-    end
-
-    if @options.target_dir.nil? && config['target_directory']
-      if config['target_directory'] == 'auto'
-        @options.target_dir = simp_target_dir
-      else
-        unless config['target_directory'][0].chr == '/'
-          raise("Error: 'target_directory' in '#{@options.config_file}' must be an absolute path")
-        end
-
-        @options.target_dir = config['target_directory'].strip
+    if @options.git_author.nil?
+      if config['git_author'].empty?
+        msg = "'git_author' in '#{@options.config_file}' cannot be empty"
+        raise SimpRpmHelper::ConfigError.new(msg)
       end
+      @options.git_author = config['git_author']
     end
+
+    @options.git_email = config['git_email'] if @options.git_email.nil?
+
+    if @options.target_dir.nil?
+      unless config['target_dir'][0].chr == '/'
+        msg = "'target_dir' in '#{@options.config_file}' must be an absolute path"
+        raise SimpRpmHelper::ConfigError.new(msg)
+      end
+
+      # clean up any relative sub-paths for tidier logging
+      @options.target_dir = File.expand_path(config['target_dir'].strip)
+    end
+
+    if @options.work_dir.nil?
+      unless config['work_dir'][0].chr == '/'
+        msg = "'work_dir' in '#{@options.config_file}' must be an absolute path"
+        raise SimpRpmHelper::ConfigError.new(msg)
+      end
+
+      # clean up any relative sub-paths for tidier logging
+      @options.work_dir = File.expand_path(config['work_dir'].strip)
+    end
+
+    @options.verbose = config['verbose'] if @options.verbose.nil?
+
+    debug("Running with config=#{@options.to_h}")
   end
 
+=begin
+  # TODO Re-enable this when the option to run R10K/CodeManager is added
   def puppet_codedir
     # Figure out where the Puppet code should go
     # Puppet 4+
@@ -276,217 +608,272 @@ class SimpRpmHelper
   def puppet_group
     puppet_config['group']
   end
+=end
 
-  # Return the target installation directory
-  def simp_target_dir(subdir=File.join('simp','modules'))
-    install_target = puppet_codedir
-
-    if install_target.empty?
-      raise('Error: Could not find a Puppet code directory for installation')
-    end
-
-    install_target = File.join(install_target,'environments', subdir)
-
-    return install_target
-  end
-
-  # Input Validation
-  def validate_options(usage)
-    return if @options.help_requested
-
-    unless @options.rpm_dir
-      raise("Error: 'rpm_dir' is required\n#{usage}")
-    end
-
-    unless @options.rpm_status
-      raise("Error: 'rpm_status' is required\n#{usage}")
-    end
-
-    unless @options.rpm_section
-      raise("Error: 'rpm_section' is required\n#{usage}")
-    end
-
-    # We allow 'post' for backward compatibility with SIMP RPMs that use
-    # this, but copying over files in the 'post' during an upgrade is
-    # problematic.  If the old package has files that are not in the new
-    # package, these files will not be removed in the destination directory.
-    # This is because during %post, the old package files have not yet
-    # been removed from the source directory by RPM. So, the 'rsync'
-    # operation copies over the OBE files from the old package.
-    valid_rpm_sections = ['pre','post','preun','postun', 'posttrans']
-
-    unless valid_rpm_sections.include?(@options.rpm_section)
-      raise("Error: 'rpm_section' must be one of '#{valid_rpm_sections.join("', '")}'\n#{usage}")
-    end
-
-    if (@options.rpm_section == 'posttrans') || (@options.rpm_section == 'preun') || (@options.rpm_section == 'post')
-      unless File.directory?(@options.rpm_dir)
-        raise("Error: Could not find 'rpm_dir': '#{@options.rpm_dir}'")
+  # Returns true if the component does not require a bare repo update
+  def skip_required?
+    skip = false
+    if @skip_components.keys.include?(@module_fullname)
+      skip = true
+      if (['posttrans', 'post'].include?(@options.rpm_section) and
+        ['1', '2'].include?(@options.rpm_status)
+      )
+        info("Skipping repo update for #{@module_fullname}: #{@skip_modules[@options.module_name]}")
+      else
+        debug(noop_msg)
       end
     end
-
-    unless @options.rpm_status =~ /^\d+$/
-      raise("Error: 'rpm_status' must be an integer\n#{usage}")
-    end
-
+    skip
   end
 
-  def handle_install
-    debug("Processing install, upgrade, or downgrade of #{@options.module_name}")
-    if @safe_modules.include?(@options.module_name)
-      # Make sure that we preserve anything in the safe modules on installation
-      @options.preserve = true
-
-      if @options.rpm_status == '2'
-        # Short circuit on upgrading safe modules, just don't touch them!
-        target_module_dir = File.join(@options.target_dir, @options.module_name)
-        if File.directory?(target_module_dir)
-          debug("Skipping upgrade of 'safe' module directory #{target_module_dir}")
-          return
+  # Tags the modules central Git repository with the latest imported version
+  #
+  # @raises SimpRpmHelper::CommandError if any git operation fails
+  def tag_version
+    Dir.chdir(@work_repo_dir) do
+      # See if a tag is required
+      results = execute("#{@git} tag -l")
+      if results[:stdout].match(/^#{Regexp.escape(@module_version)}$/m)
+        # make sure tag content is correct
+        results = execute("#{@git} diff --name-only tags/#{@module_version} .")
+        if results[:stdout].strip.empty?
+          tag_required = false
+        else
+          #FIXME? As a courtesy, warn folks the munged tag will be overwritten
+          tag_required = true
         end
+      else
+        tag_required = true
+      end
+
+      if tag_required
+        # We're force pushing to handle the case in which the tag exists with
+        # different content.  If the user munged a SIMP-generated tag, the git
+        # reference for the munged version should still be available on the
+        # branch the version was created from.  This is true even for the
+        # master branch, as we never force push to master.
+        info("Tagging version #{@module_version}")
+        tag_msg = "Version #{@module_version} tagged by #{PROGRAM_NAME} #{VERSION}"
+        tag_cmd = [
+          "GIT_COMMITTER_NAME='#{@options.git_author}'",
+          "GIT_COMMITTER_EMAIL='#{@options.git_email}'",
+          "#{@git} tag -a -f",
+          @module_version,
+          "-m '#{tag_msg}'"
+        ].join(' ')
+        execute(tag_cmd, "Failed to create annotated tag in #{@work_repo_dir}")
+
+        execute("#{@git} push origin #{@module_version} -f",
+          "Failed to push annotated tag to #{@target_repo_dir}")
+      else
+        info("Valid #{@module_version} tag exists")
       end
     end
 
-    raise('Error: Could not determine puppet group') if puppet_group.empty?
-    rsync = Facter::Core::Execution.which('rsync')
-    raise("Error: Could not find 'rsync' command!") unless rsync
-
-    # Create the directories, with the proper mode, all the way down
-    dir_paths = @options.target_dir.split(File::SEPARATOR).reject(&:empty?)
-    top_dir = File::SEPARATOR + dir_paths.shift
-    unless File.directory?(top_dir)
-      FileUtils.mkdir(top_dir, :mode => 0750)
-      FileUtils.chown('root', puppet_group, top_dir)
-    end
-
-    orig_dir = Dir.pwd
-    Dir.chdir(top_dir)
-    dir_paths.each do |dir|
-      unless File.directory?(dir)
-        FileUtils.mkdir(dir, :mode => 0750)
-        FileUtils.chown('root', puppet_group, dir)
-      end
-
-      Dir.chdir(dir)
-    end
-    Dir.chdir(orig_dir)
-
-    cmd = %(#{rsync} -a --force)
-
-    if @options.preserve
-      cmd += %( --ignore-existing)
-    else
-      cmd += %( --delete)
-    end
-
-    cmd += %( --verbose) if @options.debug
-
-    cmd += %( #{@options.rpm_dir} #{@options.target_dir})
-    cmd += %( 2>&1)
-
-    info("Copying '#{@options.module_name}' files into '#{@options.target_dir}'")
-    debug("Executing: #{cmd}")
-    output = %x{#{cmd}}
-    debug("Output:\n#{output}")
-    unless $?.success?
-      raise(%(Error: Copy of '#{@options.module_name}' into '#{@options.target_dir}' using '#{cmd}' failed with the following error:\n    #{output.gsub("\n","\n    ")}))
-    end
-
-    FileUtils.chown_R(nil, "#{puppet_group}", @options.target_dir)
+    # Success!  No need to save our temporary work dir.
+    FileUtils.rm_rf(@work_repo_dir)
   end
 
+  # Process an RPM uninstall (erase).
+  #
+  # Intentionally do **not** do anything to the module's repo, as we can't be
+  # assured it is not being used.
+  # TODO Have a configuration option that allows the (informed) user to remove
+  #      the module's git repo on RPM uninstall?
   def handle_uninstall
-    debug("Processing uninstall of #{@options.module_name}")
-    # Play it safe, this needs to have at least 'environments/simp' in it!
-    if @options.target_dir.split(File::SEPARATOR).reject(&:empty?).size < 3
-      raise("Error: Not removing directory '#{@options.target_dir}' for safety")
+    debug("Processing uninstall of #{@module_fullname}")
+    if Dir.exist?(@target_repo_dir)
+      msg = [
+        "'#{@module_fullname}' git repo has been preserved at",
+        indent(@target_repo_dir),
+        '',
+        indent('>>> Please remove it manually if you no longer need it. <<<'),
+      ].join("\n")
+      info(msg)
     end
 
-    if @safe_modules.include?(@options.module_name)
-      target_module_dir = File.join(@options.target_dir, @options.module_name)
-      debug("Skipping removal of 'safe' module directory #{target_module_dir}")
-      return
-    end
-
-    info("Removing '#{@options.module_name}' files from '#{@options.target_dir}'")
-
-    # Find out what we have
-    ref_list = []
-    Dir.chdir(@options.rpm_dir) do
-      Find.find('.').each do |file|
-        if File.symlink?(file)
-          ref_list << file
-          Find.prune
-        end
-
-        ref_list << file
-      end
-    end
-
-    # Delete from the bottom up to clear out the directories first
-    # before removing them
-    ref_list.reverse!
-    ref_list.map{|x| x.sub!(/^./, @options.module_name)}
-
-    # Only delete items that are in the reference repo
-    Dir.chdir(@options.target_dir) do
-      ref_list.each do |to_rm|
-        if File.symlink?(to_rm)
-          debug("Removing symlink #{to_rm}")
-          FileUtils.rm_f(to_rm)
-        elsif File.directory?(to_rm) && (Dir.entries(to_rm).delete_if {|dir|
-            dir == '.' || dir == '..'}.size == 0)
-          debug("Removing directory #{to_rm}")
-          FileUtils.rmdir(to_rm)
-        elsif File.exist?(to_rm)
-          debug("Removing file #{to_rm}")
-          FileUtils.rm_f(to_rm)
-        end
-      end
-    end
+    FileUtils.rm_rf(@work_repo_dir)
   end
 
+  # Load configuration and execute the operation requested
+  #
+  # +args+: Array of command line arguments
+  #
+  # @returns 0 upon success
+  # @returns a non-0 value upon any failure
   def run(args)
     parse_options(args)
     return 0 if @options.help_requested
 
-    process_config
-    debug("Running with config=#{@options.to_s}")
+    unless ['posttrans', 'post', 'preun'].include?(@options.rpm_section)
+      debug(noop_msg)
+      return 0
+    end
 
-    # If the target directory is managed, we're done
-    target_module_dir = File.join(@options.target_dir, @options.module_name)
-    unless is_managed?(target_module_dir) || !@options.copy_rpm_data
+    process_config_file
+    load_module_info
+    return 0 if skip_required?
 
-      debug("Processing unmanaged target directory #{target_module_dir}")
+    # bare repo directories, by convention, end in .git
+    @target_repo_dir = File.join(@options.target_dir, @module_fullname + '.git')
+    @work_repo_dir = File.join(@options.work_dir, @module_fullname)
 
-      if (@options.rpm_section == 'posttrans') || (@options.rpm_section == 'post')
-        # A regular installation, upgrade or downgrade
-        # This *should* happen in the RPM %posttrans, but we allow this to
-        # occur in the %post for backward compatibility with SIMP RPMs that
-        # erroneously try to affect a copy in the %post. (Copying over the
-        # files in the RPM %post during an upgrade/downgrade is problematic.
-        # If the old package has files that are not in the new package,
-        # these files will not yet have been removed in the source
-        # directory, and thus end up in the target directory.)
-        handle_install
-      elsif @options.rpm_section == 'preun' && @options.rpm_status == '0'
-        # A regular uninstall
-        # This needs to happen *before* RPM removes the files (%preun with
-        # status 0), since we need to compare with what's on disk to undo
-        # the copy done during the RPM install via handle_install()
+    case @options.rpm_section
+    when 'posttrans'
+      if ['1', '2'].include?(@options.rpm_status)
+        # A regular installation or version change (upgrade/downgrade)
+        update_central_repo
+      else
+        debug(noop_msg)
+      end
+    when 'post'
+      # A regular installation or version change (upgrade/downgrade) for
+      # an old SIMP RPM that **erroneously** calls this script in the
+      # %post instead of the %posttrans.
+      handle_post_error
+    when 'preun'
+      if @options.rpm_status == '0'
+        # A regular uninstall (erase)
         handle_uninstall
+      else
+        debug(noop_msg)
       end
     end
+
     return 0
-  rescue RuntimeError => e
-    $stderr.puts(e)
+  rescue ConfigError, ComponentError => e
+    error(e)
     return 1
+  rescue CommandError => e
+    msg = [ e.message ]
+    unless @options.verbose
+      msg << ''
+      msg << '          Execute the following to debug the problem: '
+      msg << ''
+      msg << "#{@cmd_line} -v"
+      msg << ''
+    end
+    error(msg.join("\n"))
+    return 2
   rescue Exception => e
-    $stderr.puts(e)
-    e.backtrace.first(10).each{|l| $stderr.puts l }
-    return 1
+    msg = [ e.message ]
+    e.backtrace.first(10).each { |l| msg << " #{l}" }
+    error(msg.join("\n"))
+    return 3
+  end
+
+  # @returns a 'no operation' message for the configured options
+  def noop_msg
+    detail = RPM_STATUS_MAP[@options.rpm_section][@options.rpm_status.to_i]
+    if detail.nil?
+      detail = "#{@options.rpm_section} with #{@options.rpm_status} RPM status"
+    end
+    name = @module_fullname.nil? ? @options.rpm_name : @module_fullname
+    "No operation required for #{name} '#{@options.rpm_section}' during #{detail}"
+  end
+
+  # Command line option validation
+  # @raises SimpRpmHelper::ConfigError if any required option is missing or
+  #         any option fails validation
+  def validate_options(usage)
+    return if @options.help_requested
+
+    unless @options.rpm_dir
+      raise SimpRpmHelper::ConfigError.new("'rpm_dir' is required\n#{usage}")
+    end
+
+    unless @options.rpm_dir[0].chr == '/'
+      msg = "'rpm_dir'  must be an absolute path"
+      raise SimpRpmHelper::ConfigError.new(msg)
+    end
+    # clean up any relative sub-paths for tidier logging
+    @options.rpm_dir = File.expand_path(@options.rpm_dir)
+
+    unless @options.rpm_status
+      raise SimpRpmHelper::ConfigError.new("'rpm_status' is required\n#{usage}")
+    end
+
+    unless @options.rpm_section
+      raise SimpRpmHelper::ConfigError.new("'rpm_section' is required\n#{usage}")
+    end
+
+    valid_rpm_sections = ['pre','post','preun','postun', 'posttrans']
+    unless valid_rpm_sections.include?(@options.rpm_section)
+      msg = "'rpm_section' must be one of '#{valid_rpm_sections.join("', '")}'\n#{usage}"
+      raise SimpRpmHelper::ConfigError.new(msg)
+    end
+
+    if (@options.rpm_section == 'posttrans') || (@options.rpm_section == 'preun')
+      unless File.directory?(@options.rpm_dir)
+        msg = "Could not find 'rpm_dir': '#{@options.rpm_dir}'"
+        raise SimpRpmHelper::ConfigError.new(msg)
+      end
+    end
+
+    unless @options.rpm_status =~ /^\d+$/
+      msg = "'rpm_status' must be an integer\n#{usage}"
+      raise SimpRpmHelper::ConfigError.new(msg)
+    end
+
+    if @options.target_dir
+      unless @options.target_dir.chr == '/'
+        msg ="'target_dir' must be an absolute path\n#{usage}"
+        raise SimpRpmHelper::ConfigError.new(msg)
+      end
+
+      # clean up any relative sub-paths for tidier logging
+      @options.target_dir = File.expand_path(@options.target_dir)
+    end
+
+    if @options.work_dir
+      unless @options.target_dir.chr == '/'
+        msg = "'work_dir' must be an absolute path\n#{usage}"
+        raise SimpRpmHelper::ConfigError.new(msg)
+      end
+
+      # clean up any relative sub-paths for tidier logging
+      @options.work_dir = File.expand_path(@options.work_dir)
+    end
+
+    if @options.git_author
+      if @options.git_author.empty?
+        msg = "'git_author' cannot be empty\n#{usage}"
+        raise SimpRpmHelper::ConfigError.new(msg)
+      end
+    end
+  end
+
+
+  ##############################################################################
+  # Log helpers
+
+  # +msg+: message string
+  def debug(msg)
+    return unless @options.verbose
+    msg.split("\n").each do |line|
+      puts "#{PROGRAM_NAME} DEBUG: #{line}"
+    end
+  end
+
+  # +msg+: message string
+  def info(msg)
+    # When these messages get written out in an RPM operation, name of program
+    # is helpful to end user
+    puts "#{PROGRAM_NAME} INFO: #{msg}"
+  end
+
+  # +msg+: message string
+  def error(msg)
+    $stderr.puts "#{PROGRAM_NAME} ERROR: #{msg}"
+  end
+
+  # +msg+: message string
+  def warn(msg)
+    $stderr.puts "#{PROGRAM_NAME} WARN: #{msg}"
   end
 end
+
+################################################################################
 
 if __FILE__ == $0
   helper = SimpRpmHelper.new

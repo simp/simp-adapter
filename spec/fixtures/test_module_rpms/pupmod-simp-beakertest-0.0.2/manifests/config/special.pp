@@ -1,0 +1,2 @@
+class beakertest::config::special {
+}
