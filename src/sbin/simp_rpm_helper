@@ -175,7 +175,7 @@ class SimpRpmHelper
   def clone_and_update
     # minimize the # of times we spew out the entire path to the git repo
     repo = @repo_created ? 'master branch' : @target_repo_dir + ' master branch'
-    info("Updating #{repo} with version #{@module_version}")
+    debug("Updating #{repo} with version #{@module_version}")
 
     debug("Cloning #{@target_repo_dir} to #{@work_repo_dir}")
     # start clean
@@ -227,7 +227,7 @@ class SimpRpmHelper
   #
   # @raises SimpRpmHelper::CommandError if the 'git --init' operation fails
   def create_central_repo(target_repo_dir)
-    info("Creating central repo #{target_repo_dir}")
+    debug("Creating central repo #{target_repo_dir}")
     FileUtils.mkdir_p(File.dirname(target_repo_dir))
 
     execute("#{@git} init --bare #{target_repo_dir}",
@@ -240,8 +240,8 @@ class SimpRpmHelper
   end
 
   # Executes a command
-  # +cmd+::     Command to be executed
-  # +fail_msg:: Prefix to add to the failure message, if the command fails.
+  # +cmd+:     Command to be executed
+  # +fail_msg+: Prefix to add to the failure message, if the command fails.
   #
   # @returns Hash with stdout output and stderr output if the command succeeds
   # @raises SimpRpmHelper::CommandError if the command fails. The failure
@@ -327,7 +327,7 @@ class SimpRpmHelper
     create_central_repo(@target_repo_dir) unless Dir.exist?(@target_repo_dir)
     clone_and_update
     tag_version
-    info('Repo update completed.')
+    debug('Repo update completed.')
   end
 
   # Extract the module full name (<author>-<name>) and version from its
@@ -347,7 +347,7 @@ class SimpRpmHelper
       end
     end
 
-    unless @module_fullname and @module_version
+    unless @module_fullname && @module_version
       msg = "Could not extract module information from #{metadata_file}"
       raise SimpRpmHelper::ComponentError.new(msg)
     end
@@ -615,10 +615,10 @@ class SimpRpmHelper
     skip = false
     if @skip_components.keys.include?(@module_fullname)
       skip = true
-      if (['posttrans', 'post'].include?(@options.rpm_section) and
+      if (['posttrans', 'post'].include?(@options.rpm_section) &&
         ['1', '2'].include?(@options.rpm_status)
       )
-        info("Skipping repo update for #{@module_fullname}: #{@skip_modules[@options.module_name]}")
+        debug("Skipping repo update for #{@module_fullname}: #{@skip_components[@options.module_name]}")
       else
         debug(noop_msg)
       end
@@ -652,7 +652,7 @@ class SimpRpmHelper
         # reference for the munged version should still be available on the
         # branch the version was created from.  This is true even for the
         # master branch, as we never force push to master.
-        info("Tagging version #{@module_version}")
+        debug("Tagging version #{@module_version}")
         tag_msg = "Version #{@module_version} tagged by #{PROGRAM_NAME} #{VERSION}"
         tag_cmd = [
           "GIT_COMMITTER_NAME='#{@options.git_author}'",
@@ -666,7 +666,7 @@ class SimpRpmHelper
         execute("#{@git} push origin #{@module_version} -f",
           "Failed to push annotated tag to #{@target_repo_dir}")
       else
-        info("Valid #{@module_version} tag exists")
+        debug("Valid #{@module_version} tag exists")
       end
     end
 
@@ -779,27 +779,27 @@ class SimpRpmHelper
     return if @options.help_requested
 
     unless @options.rpm_dir
-      raise SimpRpmHelper::ConfigError.new("'rpm_dir' is required\n#{usage}")
+      raise SimpRpmHelper::ConfigError.new("'rpm_dir' is required\n\n#{usage}")
     end
 
     unless @options.rpm_dir[0].chr == '/'
-      msg = "'rpm_dir'  must be an absolute path"
+      msg = "'rpm_dir' must be an absolute path"
       raise SimpRpmHelper::ConfigError.new(msg)
     end
     # clean up any relative sub-paths for tidier logging
     @options.rpm_dir = File.expand_path(@options.rpm_dir)
 
     unless @options.rpm_status
-      raise SimpRpmHelper::ConfigError.new("'rpm_status' is required\n#{usage}")
+      raise SimpRpmHelper::ConfigError.new("'rpm_status' is required\n\n#{usage}")
     end
 
     unless @options.rpm_section
-      raise SimpRpmHelper::ConfigError.new("'rpm_section' is required\n#{usage}")
+      raise SimpRpmHelper::ConfigError.new("'rpm_section' is required\n\n#{usage}")
     end
 
-    valid_rpm_sections = ['pre','post','preun','postun', 'posttrans']
+    valid_rpm_sections = ['pre', 'post', 'preun', 'postun', 'posttrans']
     unless valid_rpm_sections.include?(@options.rpm_section)
-      msg = "'rpm_section' must be one of '#{valid_rpm_sections.join("', '")}'\n#{usage}"
+      msg = "'rpm_section' must be one of '#{valid_rpm_sections.join("', '")}'\n\n#{usage}"
       raise SimpRpmHelper::ConfigError.new(msg)
     end
 
@@ -811,13 +811,13 @@ class SimpRpmHelper
     end
 
     unless @options.rpm_status =~ /^\d+$/
-      msg = "'rpm_status' must be an integer\n#{usage}"
+      msg = "'rpm_status' must be an integer: '#{@options.rpm_status}'"
       raise SimpRpmHelper::ConfigError.new(msg)
     end
 
     if @options.target_dir
       unless @options.target_dir.chr == '/'
-        msg ="'target_dir' must be an absolute path\n#{usage}"
+        msg ="'target_dir' must be an absolute path"
         raise SimpRpmHelper::ConfigError.new(msg)
       end
 
@@ -826,8 +826,8 @@ class SimpRpmHelper
     end
 
     if @options.work_dir
-      unless @options.target_dir.chr == '/'
-        msg = "'work_dir' must be an absolute path\n#{usage}"
+      unless @options.work_dir.chr == '/'
+        msg = "'work_dir' must be an absolute path"
         raise SimpRpmHelper::ConfigError.new(msg)
       end
 
@@ -837,7 +837,7 @@ class SimpRpmHelper
 
     if @options.git_author
       if @options.git_author.empty?
-        msg = "'git_author' cannot be empty\n#{usage}"
+        msg = "'git_author' cannot be empty"
         raise SimpRpmHelper::ConfigError.new(msg)
       end
     end

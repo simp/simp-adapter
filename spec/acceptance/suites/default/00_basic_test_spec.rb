@@ -1,14 +1,15 @@
 require 'spec_helper_acceptance'
 
 test_name 'simp-adapter'
-# This test uses 2 of the 3 test module RPMs:
+# This test uses 3 of the 4 test module RPMs:
 # - pupmod-simp-beakertest-0.0.1-0.noarch.rpm
 #   - Has simp_rpm_helper in %post
 # - pupmod-simp-beakertest-0.0.3-0.noarch.rpm
 #   - Has simp_rpm_helper in %posttrans
 #   - Has an empty spec/fixutres/simp_rspec directory, which will not be checked
 #     into git
-
+# - pupmod-simp-site-2.0.5-0.noarch.rpm
+#   - Has simp_rpm_helper in %posttrans
 
 describe 'simp-adapter' do
   let(:local_yum_repo) {'/srv/local_yum' }
@@ -259,6 +260,16 @@ repo_gpgcheck=0
           # verify module tag is intact
           on(host, "cd simp-beakertest-save; git checkout tags/#{mod_version}")
           compare_to_repo_branch(host, '/root/simp-beakertest-save', mod_repo_url, mod_version)
+        end
+      end
+
+      context 'Skipped module RPM install' do
+        it 'should not prevent module install' do
+          host.install_package('pupmod-simp-site')
+        end
+
+        it 'should not create an accessible central repo for the module' do
+          on(host, "test ! -d '/usr/share/simp/git/puppet_modules/simp-site.git'")
         end
       end
 
