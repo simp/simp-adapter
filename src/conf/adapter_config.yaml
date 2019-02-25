@@ -1,13 +1,36 @@
 # This file configures the `simp_rpm_helper` script.
 #
-# simp_rpm_helper can ensure that RPM-delivered SIMP assets (which are
-# installed into /usr/share/simp) are moved to the appropriate locations
+# simp_rpm_helper ensures that RPM-delivered, SIMP modules (which
+# are installed into /usr/share/simp/modules) are imported into
+# SIMP-managed, Git repositories.
 ---
 # Target directory
+#   The fully qualified path to the parent directory of the
+#   SIMP-managed, module Git repositories.
 #
-# May be set to a fully-qualified path or 'auto'
-# If set to 'auto', the directory will be determined from puppet itself
-# target_directory : 'auto'
-
-# Copy the RPM data to the target directory
-# copy_rpm_data : false
+# target_dir: /usr/share/simp/git/puppet_modules
+#
+# Work directory
+#    The fully qualified path for a temporary work directory used
+#    by simp_rpm_helper.
+#
+# work_dir: /var/lib/simp-adapter/git
+#
+# Git Author
+#   The author to ascribe to each Git commit made by simp_rpm_helper,
+#   when it imports module materials from a module RPM into the
+#   module's repository.  Cannot be empty.
+#
+# git_author: simp_rpm_helper
+#
+# Git Email
+#   The author's email to ascribe to each Git commit made by
+#   simp_rpm_helper, when it imports module materials from a module
+#   RPM into the module's repository.
+#
+# git_email: root@<host's FQDN>
+#
+# Verbose
+#   Whether to turn on debug logging
+#
+# verbose: false

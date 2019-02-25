@@ -2,7 +2,7 @@
 
 Summary: SIMP Adapter for the AIO Puppet Installation
 Name: simp-adapter
-Version: 0.1.1
+Version: 1.0.0
 Release: 0%{?dist}
 License: Apache-2.0
 Group: Applications/System
@@ -12,6 +12,7 @@ Buildarch: noarch
 
 Prefix: %{_sysconfdir}/simp
 
+Requires: git
 Requires: rsync
 Requires(post): puppet
 Requires(post): puppetserver
@@ -34,6 +35,7 @@ Provides: simp-adapter-foss = %{version}
 %package pe
 Summary: SIMP Adapter for the Puppet Enterprise Puppet Installation
 License: Apache-2.0
+Requires: git
 Requires: rsync
 Requires(post): puppet-agent
 Requires(post): pe-puppetserver
@@ -134,25 +136,6 @@ fi
 
 %post
 # Post installation stuff
-
-if [ $1 -eq 1 ]; then
-  # This is an initial install.
-  #
-  # If the adapter is installed during a SIMP installation (e.g., from the ISO or
-  # kickstarts), ensure that the /etc/simp/adapter_config.yaml is set up to copy over
-  # the /usr
-  #
-  # This will only work if the kernel procinfo includes a `simp_install` argument
-  simp_install=`awk -F "simp_install=" '{print $2}' /proc/cmdline | cut -f1 -d' '`
-  if [ ! -z "${simp_install}" ]; then
-    date=`date +%Y%m%d\ %H%M%S`
-    [ -f %{prefix}/adapter_config.yaml ] || echo '---' > %{prefix}/adapter_config.yaml
-    echo "# This file was modified by simp-adapter during a SIMP install" >> %{prefix}/adapter_config.yaml
-    echo "# on ${date}:"            >> %{prefix}/adapter_config.yaml
-    echo "target_directory: 'auto'" >> %{prefix}/adapter_config.yaml
-    echo 'copy_rpm_data: true'     >> %{prefix}/adapter_config.yaml
-  fi
-fi
 
 PATH=$PATH:/opt/puppetlabs/bin
 
@@ -303,6 +286,11 @@ puppet config set digest_algorithm sha256 || :
     fi
 
     rm -f hiera.yaml.simp
+
+    # Remove the default working directory of simp-adapter, which is
+    # used by simp_rpm_helper
+    # FIXME Read adapter_config.yaml to see if configured to a different value.
+    rm -rf /var/lib/simp-adapter
   fi
 )
 
@@ -340,6 +328,10 @@ puppet config set digest_algorithm sha256 || :
 )
 
 %changelog
+* Tue Feb 05 2019 Liz Nemsick <lnemsick.simp@gmail.com> -  1.0.0-0
+- Rework simp_rpm_helper to install a module's content into a
+  SIMP-managed, bare Git repository, instead of a 'simp' environment.
+
 * Fri Dec 07 2018 Liz Nemsick <lnemsick.simp@gmail.com> -  0.1.1-0
 - Affect a copy with simp_rpm_helper when called in either the %posttrans
   or %post of a SIMP RPM.

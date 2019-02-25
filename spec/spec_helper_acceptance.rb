@@ -2,7 +2,10 @@ require 'beaker-rspec'
 require 'tmpdir'
 require 'yaml'
 require 'simp/beaker_helpers'
+require_relative 'acceptance/helpers/gitutils'
+
 include Simp::BeakerHelpers
+include Acceptance::Helpers::GitUtils
 
 
 # Repository helper methods stolen from simp-core/spec/acceptance/helpers/repo_helper.rb
