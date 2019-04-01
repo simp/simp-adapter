@@ -5,6 +5,7 @@ dist
 /pkg
 /spec/fixtures
 /spec/rp_env
+/spec/acceptance/suites/default/nodesets
 !/spec/hieradata/default.yaml
 !/spec/fixtures/site.pp
 !/spec/fixtures/test_module_rpms/

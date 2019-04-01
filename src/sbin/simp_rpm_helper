@@ -1,49 +1,61 @@
 #!/opt/puppetlabs/puppet/bin/ruby
 #
-# Purpose
-# -------
+# OVERVIEW
+# --------
 #
-# simp_rpm_helper ensures that RPM-delivered, SIMP modules (which
-# are installed into /usr/share/simp/modules) are imported into
-# SIMP-managed, Git repositories.
+# `simp_rpm_helper` ensures that the Puppet module content of each
+# SIMP-provided, Puppet module RPM is imported from its RPM installation
+# location, `/usr/share/simp/modules/<module name>`, into a local,
+# SIMP-managed, Git repository.  This local Git repository can, in turn,
+# be referenced in Puppetfiles that R10K or Code Manager can use to
+# populate Puppet module environments.
 #
-# When called during the %posttrans section (scriptlet) of the
-# an RPM install, upgrade, or downgrade, it does the following:
+# OPERATION
+# ---------
 #
-# - Creates /usr/share/simp/git, if it does not exist
-# - Creates /usr/share/simp/git/puppet_modules, if it does not exist
-# - Creates a central (bare) Git repository for the module, if it
-#   does not exist
-#   - The repository is named using the 'name' field from
-#     its metadata.json file:
+# `simp_rpm_helper` is automatically called by different RPM scriptlets
+# (sections) of a SIMP-provided, Puppet module RPM.
 #
-#      /usr/share/simp/git/puppet_modules/<owner>-<name>.git
+# * When called during the `%posttrans` scriptlet of the an RPM install,
+#   upgrade, or downgrade, it does the following:
 #
-# - Updates the master branch of the repository to be the contents
-#   of the RPM, excluding any empty directories
-# - Adds a Git tag to the repository that matches the version number
-#   in the module's metadata.json file, as necessary
-#   - Overwrites the tag if it exists but doesn't match the contents
-#      of the RPM
+#   - Creates `/usr/share/simp/git/`, if it does not exist
+#   - Creates `/usr/share/simp/git/puppet_modules/`, if it does not exist
+#   - Creates a central (bare) Git repository for the module, if it
+#     does not exist
 #
-# If called during any other RPM section, it does nothing to the
-# module's repository.  However, it does log important information
-# in two cases:
-# - If called during the %post section in an install or upgrade,
-#   (i.e., is called from an old, buggy SIMP RPM), it logs a message
-#   telling the user how to fix the problem by calling simp_rpm_helper
-#   with the correct arguments.
-# - If called during a %preun when the RPM status is 0, i.e., a RPM
-#   uninstall (erase), it logs a message telling the user that the
-#   module's git repo has been preserved. (We can't remove it,
-#   as we don't know if it is in use.)
+#     - The repository is named using the top-level 'name' field from
+#       the module's `metadata.json` file:
 #
-# Configuration
+#       `/usr/share/simp/git/puppet_modules/<owner>-<name>.git`
+#
+#   - Updates the master branch of the repository to be the contents
+#     of the RPM, excluding any empty directories
+#   - Adds a Git tag to the repository that matches the version number
+#     in the module's `metadata.json` file, as necessary
+#
+#     - Overwrites the tag if it already exists but doesn't match the
+#       contents of the RPM
+#
+# * When called during any other RPM scriptlet, it does nothing to the
+#   module's repository.  However, it does log important information
+#   in two cases:
+#
+#   - If called during the `%post` section in an install or upgrade,
+#     (i.e., is called from an old, buggy, SIMP-provided, Puppet module
+#     RPM), it logs a message telling the user how to fix the problem
+#     by calling `simp_rpm_helper` with the correct arguments.
+#   - If called during a `%preun` when the RPM status is 0, i.e., a RPM
+#     uninstall (erase), it logs a message telling the user that the
+#     module's local, RPM-based git repo has been preserved. (We can't
+#     remove the repository, as we don't know if it is in use.)
+#
+# CONFIGURATION
 # -------------
 #
-# simp_rpm_helper can be configured via a YAML file, which, if not
+# `simp_rpm_helper` can be configured via a YAML file, which, if not
 # specified in a command line option, defaults to
-#     /etc/simp/adapter_config.yaml.
+#     /etc/simp/adapter_conf.yaml.
 #
 # Below is an example of the configuration file that shows the default
 # options.  If any other configuration options are specified, for example,
@@ -61,7 +73,7 @@
 #   #    The fully qualified path for a temporary work directory used
 #   #    by simp_rpm_helper.
 #   #
-#   work_dir: /var/lib/simp-adapter/git
+#   work_dir: /var/lib/simp-adapter
 #   #
 #   # Git Author
 #   #   The author to ascribe to each Git commit made by simp_rpm_helper,
@@ -75,7 +87,7 @@
 #   #   simp_rpm_helper, when it imports module materials from a module
 #   #   RPM into the module's repository.
 #   #
-#   git_email: root@<host's FQDN>
+#   git_email: root@localhost.localdomain
 #   #
 #   # Verbose
 #   #   Whether to turn on debug logging
@@ -83,20 +95,39 @@
 #   verbose: false
 # ```
 #
+# OTHER DETAILS
+# -------------
+#
+# Below are a few other details about `simp_rpm_helper` that are worth noting:
+#
+# * `simp_rpm_helper` no longer supports installation of files from the
+#   `simp-environment` RPM.  The mechanism to install `simp-environment` files
+#   into a Puppet environment or into `/var/simp/environments/<environment>`,
+#   (sometimes referred to as SIMP's secondary environment) has been migrated
+#   to a new command provided by SIMP's command line interface
+#   (`rubygem-simp-cli` package). Execute `simp help` for more information.
+# * `simp_rpm_helper` will not create a Git repository for `pupmod-simp-site`
+#   package, as this package is no longer used beginning with SIMP 6.4.0.
+# * The `master` branch of a local Puppet module Git repository will contain
+#   a local transaction history for the RPM of that module, ***NOT*** a
+#   copy of the Git history in the public repository for that project.
+#   Regardless, you should always use a tagged version from a local module
+#   repository.
+# * If for any reason you need to debug `simp_rpm_helper` operation, this script
+#   executes git operations in temporary directories, that, by default, are
+#   located in `/var/lib/simp-adapter`.  These temporary directories are normally
+#   purged after successful `simp_rpm_helper` operation.  Upon git-related
+#   failures, however, they are preserved to aid debug.
+#
 
 require 'facter'
 require 'fileutils'
 require 'json'
 require 'optparse'
 require 'ostruct'
+require 'pathname'
 require 'securerandom'
 require 'yaml'
-
-=begin
-# TODO Re-enable this when the option to run R10K/CodeManager is added
-# Make sure we can find the Puppet executables
-ENV['PATH'] += ':/opt/puppetlabs/bin'
-=end
 
 class SimpRpmHelper
 
@@ -105,24 +136,14 @@ class SimpRpmHelper
   class CommandError < StandardError ; end
 
   PROGRAM_NAME = File.basename(__FILE__)
-
-  #FIXME Would be best to pin this to the simp-adapter version in the spec file.
-  # - Add a custom version validator as a prerequisite to the Rake
-  #   pkg:check_rpm_changelog task?  We do with other assets that have
-  #   version info in Ruby code and RPM spec files...
   VERSION = '1.0.0'
 
-  DEFAULT_CONFIG_FILE = '/etc/simp/adapter_config.yaml'
+  DEFAULT_CONFIG_FILE = '/etc/simp/adapter_conf.yaml'
   DEFAULT_BARE_REPOS_DIR = '/usr/share/simp/git/puppet_modules'
-  DEFAULT_WORK_DIR = '/var/lib/simp-adapter/git'
+  DEFAULT_WORK_DIR = '/var/lib/simp-adapter'
 
-  #FIXME? In an ISO install, the initial hostname for the SIMP server
-  # prior to user configuration will be 'puppet.change.me'.  This means
-  # the initial commit and tag for each module installed by the ISO
-  # will have a 'puppet.change.me' in its author and committer info...
-  # Will this be confusing to the user?
   DEFAULT_GIT_AUTHOR = PROGRAM_NAME
-  DEFAULT_GIT_EMAIL = "root@#{`hostname -f`.strip}"
+  DEFAULT_GIT_EMAIL = 'root@localhost.localdomain'
 
   # key is --rpm_section, value is an array whose index corresponds
   # to the integer representation of --rpm_status.  At each index
@@ -147,25 +168,26 @@ class SimpRpmHelper
   }
 
   def initialize
+    # simp-adapter RPM requires 'git' and 'rsync' to ensure these commands
+    # are available
     @git = Facter::Core::Execution.which('git')
     @rsync = Facter::Core::Execution.which('rsync')
 
     # A list of modules(<author>-<name>) that should never be imported
     # into the SIMP-managed bare repos and the reason each should be skipped.
-    # TODO Make this configurable?
     @skip_components = {
       'simp-site' => 'This is an empty module skeleton that belongs in a site-specific repo.',
     }
 
     # Variables to be set during processing
-    @options         = nil   # Merge of command line options, config file
-                             # settings and defaults
-    @module_fullname = nil   # <author>-<name> from metadata.json
-    @module_version  = nil   # version from metadata.json
-    @target_repo_dir = nil   # module's central (bare) repo to be created/updated
-    @repo_created    = false # whether the repo was created in this operation
-    @work_repo_dir   = nil   # temporary clone of the module's central repo; only
-                             # persists upon a git failure for developer debug
+    @options = OpenStruct.new # Merge of command line options, config file
+                              # settings and defaults
+    @module_fullname = nil    # <author>-<name> from metadata.json
+    @module_version  = nil    # version from metadata.json
+    @target_repo_dir = nil    # module's central (bare) repo to be created/updated
+    @repo_created    = false  # whether the repo was created in this operation
+    @work_repo_dir   = nil    # temporary clone of the module's central repo; only
+                              # persists upon a git failure for developer debug
   end
 
   # Clone the central repo for the component and update its master branch with
@@ -226,16 +248,22 @@ class SimpRpmHelper
   # Create a bare repo for the module to act as a central repo
   #
   # @raises SimpRpmHelper::CommandError if the 'git --init' operation fails
-  def create_central_repo(target_repo_dir)
-    debug("Creating central repo #{target_repo_dir}")
-    FileUtils.mkdir_p(File.dirname(target_repo_dir))
+  def create_central_repo
+    debug("Creating central repo #{@target_repo_dir}")
+    FileUtils.mkdir_p(File.dirname(@target_repo_dir))
 
-    execute("#{@git} init --bare #{target_repo_dir}",
-      "Failed to create git repo at #{target_repo_dir}")
+    execute("#{@git} init --bare #{@target_repo_dir}",
+      "Failed to create git repo at #{@target_repo_dir}")
 
-    # git init --shared doesn't do what we need, so adjust the permissions
-    # manually
-    FileUtils.chmod_R('g=rX,o=rX', target_repo_dir)
+    # Ideally, the Git repo we just created should be accessible to all.
+    # However, we should **only** adjust permissions to the parent
+    # directory tree if it matches the default.
+    if File.dirname(@target_repo_dir) == DEFAULT_BARE_REPOS_DIR
+      parent_path = Pathname.new(DEFAULT_BARE_REPOS_DIR)
+      parent_path.ascend { |dir| FileUtils.chmod('g=rX,o=rX', dir) }
+    end
+
+    FileUtils.chmod_R('g=rX,o=rX', @target_repo_dir)
     @repo_created = true
   end
 
@@ -293,23 +321,6 @@ class SimpRpmHelper
     FileUtils.rm_f([outfile, errfile])
   end
 
-=begin
-  # TODO Re-enable this when the option to run R10K/CodeManager is added
-  # Get the Puppet configuration parameters currently in use
-  def get_puppet_config
-    system_config = %x{puppet config --section master print}
-
-    config_hash = Hash.new
-
-    system_config.each_line do |line|
-      k,v = line.split('=')
-      config_hash[k.strip] = v.strip
-    end
-
-    return config_hash
-  end
-=end
-
   def indent(message, indent_length=2)
     message.split("\n").map {|line| ' '*indent_length + line }.join("\n")
   end
@@ -324,7 +335,7 @@ class SimpRpmHelper
   def update_central_repo
     debug("Processing install/version change for #{@module_fullname} #{@module_version}")
 
-    create_central_repo(@target_repo_dir) unless Dir.exist?(@target_repo_dir)
+    create_central_repo unless Dir.exist?(@target_repo_dir)
     clone_and_update
     tag_version
     debug('Repo update completed.')
@@ -365,8 +376,6 @@ class SimpRpmHelper
   def parse_options(args)
     # save this off for warning/error messages
     @cmd_line = "#{$0} #{args.join( ' ' )}"
-
-    @options = OpenStruct.new
 
     all_opts = OptionParser.new do |opts|
       opts.banner = "Usage: #{PROGRAM_NAME} -d DIR -s SECTION -S STATUS [options]"
@@ -584,32 +593,6 @@ class SimpRpmHelper
     debug("Running with config=#{@options.to_h}")
   end
 
-=begin
-  # TODO Re-enable this when the option to run R10K/CodeManager is added
-  def puppet_codedir
-    # Figure out where the Puppet code should go
-    # Puppet 4+
-    code_dir = puppet_config['codedir']
-    if !code_dir || code_dir.empty?
-      code_dir = puppet_config['confdir']
-    end
-
-    return code_dir
-  end
-
-  def puppet_config
-    unless @puppet_config
-      @puppet_config = get_puppet_config
-    end
-    @puppet_config
-  end
-
-
-  def puppet_group
-    puppet_config['group']
-  end
-=end
-
   # Returns true if the component does not require a bare repo update
   def skip_required?
     skip = false
@@ -639,7 +622,7 @@ class SimpRpmHelper
         if results[:stdout].strip.empty?
           tag_required = false
         else
-          #FIXME? As a courtesy, warn folks the munged tag will be overwritten
+          debug("Previous tag for version #{@module_version} is incorrect and will be overwritten.")
           tag_required = true
         end
       else

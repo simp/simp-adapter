@@ -14,7 +14,7 @@
 #    The fully qualified path for a temporary work directory used
 #    by simp_rpm_helper.
 #
-# work_dir: /var/lib/simp-adapter/git
+# work_dir: /var/lib/simp-adapter
 #
 # Git Author
 #   The author to ascribe to each Git commit made by simp_rpm_helper,
@@ -28,7 +28,7 @@
 #   simp_rpm_helper, when it imports module materials from a module
 #   RPM into the module's repository.
 #
-# git_email: root@<host's FQDN>
+# git_email: root@localhost.localdomain
 #
 # Verbose
 #   Whether to turn on debug logging
