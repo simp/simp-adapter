@@ -54,12 +54,6 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
     -w, --work_dir DIR               The fully qualified path for a temporary
                                      work directory.
                                          Default: /var/lib/simp-adapter
-    -a, --git_author AUTHOR          The (non-empty) author to use for commits
-                                     to the module Git repo.
-                                         Default: #{script}
-    -e, --git_email EMAIL            The email address to use for commits
-                                     to the module Git repo.
-                                         Default: root@localhost.localdomain
     -v, --verbose                    Print out debug info when processing.
     -h, --help                       Help Message
     EOM
@@ -162,11 +156,6 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
         expect( @helper.run(['--rpm_dir=/var', '--rpm_section=posttrans', '--rpm_status=1', '--work_dir=oops']) ).to eq(1)
       end
 
-      it 'should fail if git_author option is empty' do
-        expected = "#{script} ERROR: 'git_author' cannot be empty\n"
-        expect{ @helper.run(['--rpm_dir=/var', '--rpm_section=posttrans', '--rpm_status=1', '--git_author=']) }.to output(expected).to_stderr
-        expect( @helper.run(['--rpm_dir=/var', '--rpm_section=posttrans', '--rpm_status=1', '--git_author=']) ).to eq(1)
-      end
     end
 
     context 'config file error cases' do
@@ -180,13 +169,6 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
         expected = /#{Regexp.escape("#{script} ERROR: Config file '#{__FILE__}' could not be processed")}/
         expect{ @helper.run(['--rpm_dir=/var', '--rpm_section=posttrans', '--rpm_status=1', "--config=#{__FILE__}"]) }.to output(expected).to_stderr
         expect( @helper.run(['--rpm_dir=/var', '--rpm_section=posttrans', '--rpm_status=1', "--config=#{__FILE__}"]) ).to eq(1)
-      end
-
-      it 'should fail if git_author from config file is empty' do
-        config_file = File.join(files_dir, 'config_invalid_git_author.yaml')
-        expected = "#{script} ERROR: 'git_author' in '#{config_file}' cannot be empty\n"
-        expect{ @helper.run(['--rpm_dir=/var', '--rpm_section=posttrans', '--rpm_status=1', "--config=#{config_file}"]) }.to output(expected).to_stderr
-        expect( @helper.run(['--rpm_dir=/var', '--rpm_section=posttrans', '--rpm_status=1', "--config=#{config_file}"]) ).to eq(1)
       end
 
       it 'should fail if target_dir from config file is not an absolute path' do
@@ -222,8 +204,6 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
         config = {
           'target_dir' => File.join(@tmp_dir, 'repos'),
           'work_dir'   => File.join(@tmp_dir, 'work_dir'),
-          'git_author' => 'testauthor',
-          'git_email'  => 'testauthor@test.domain',
           'verbose'    => true
         }
         config_file = File.join(@tmp_dir, 'adapter_conf.yaml')
@@ -243,20 +223,12 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
         expect(File).to exist(module_repo_dir)
         expect(File).to exist(config['work_dir'])
         expect(Dir.glob("#{config['work_dir']}/*")). to be_empty
-
-        Dir.chdir(config['work_dir'])  { `git clone file:///#{module_repo_dir}` }
-        Dir.chdir(File.join(config['work_dir'], 'simp-beakertest')) do
-          regex = /Author: #{config['git_author']} <#{config['git_email']}>/
-          expect(`git log`).to match(regex)
-        end
       end
 
       it 'should use command line options in lieu of defaults' do
         config = {
           'target_dir' => File.join(@tmp_dir, 'repos1'),
           'work_dir'   => File.join(@tmp_dir, 'work_dir1'),
-          'git_author' => 'testauthor1',
-          'git_email'  => 'testauthor1@test.domain',
           'verbose'    => false
         }
         config_file = File.join(@tmp_dir, 'adapter_conf.yaml')
@@ -264,8 +236,6 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
 
         override_repos_dir = File.join(@tmp_dir, 'repos2')
         override_work_dir  = File.join(@tmp_dir, 'work_dir2')
-        override_author    = 'testauthor2'
-        override_email     = 'testauthor2@test.domain'
         args = [
           '-d', module_src_dir,
           '-s', 'posttrans',
@@ -273,8 +243,6 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
           '-f', config_file,
           '-t', override_repos_dir,
           '-w', override_work_dir,
-          '-a', override_author,
-          '-e', override_email,
           '-v'
         ]
         one_verbose_msg = /Repo update completed/ # spot check one of the verbose messages
@@ -284,12 +252,6 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
         module_repo_dir = File.join(override_repos_dir, 'simp-beakertest.git')
         expect(File).to exist(module_repo_dir)
         expect(File).to exist(override_work_dir)
-
-        Dir.chdir(override_work_dir)  { `git clone file:///#{module_repo_dir}` }
-        Dir.chdir(module_repo_dir) do
-          regex = /Author: #{override_author} <#{override_email}>/
-          expect(`git log`).to match(regex)
-        end
       end
     end
 

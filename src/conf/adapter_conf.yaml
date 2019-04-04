@@ -2,11 +2,11 @@
 #
 # simp_rpm_helper ensures that RPM-delivered, SIMP modules (which
 # are installed into /usr/share/simp/modules) are imported into
-# SIMP-managed, Git repositories.
+# local, SIMP-managed, Git repositories.
 ---
 # Target directory
 #   The fully qualified path to the parent directory of the
-#   SIMP-managed, module Git repositories.
+#   local, SIMP-managed, module Git repositories.
 #
 # target_dir: /usr/share/simp/git/puppet_modules
 #
@@ -15,20 +15,6 @@
 #    by simp_rpm_helper.
 #
 # work_dir: /var/lib/simp-adapter
-#
-# Git Author
-#   The author to ascribe to each Git commit made by simp_rpm_helper,
-#   when it imports module materials from a module RPM into the
-#   module's repository.  Cannot be empty.
-#
-# git_author: simp_rpm_helper
-#
-# Git Email
-#   The author's email to ascribe to each Git commit made by
-#   simp_rpm_helper, when it imports module materials from a module
-#   RPM into the module's repository.
-#
-# git_email: root@localhost.localdomain
 #
 # Verbose
 #   Whether to turn on debug logging

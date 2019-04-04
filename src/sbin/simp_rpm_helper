@@ -65,7 +65,7 @@
 #   ---
 #   # Target directory
 #   #   The fully qualified path to the parent directory of the
-#   #   SIMP-managed, module Git repositories.
+#   #   local, SIMP-managed, module Git repositories.
 #   #
 #   target_dir: /usr/share/simp/git/puppet_modules
 #   #
@@ -74,20 +74,6 @@
 #   #    by simp_rpm_helper.
 #   #
 #   work_dir: /var/lib/simp-adapter
-#   #
-#   # Git Author
-#   #   The author to ascribe to each Git commit made by simp_rpm_helper,
-#   #   when it imports module materials from a module RPM into the
-#   #   module's repository.  Cannot be empty.
-#   #
-#   git_author: simp_rpm_helper
-#   #
-#   # Git Email
-#   #   The author's email to ascribe to each Git commit made by
-#   #   simp_rpm_helper, when it imports module materials from a module
-#   #   RPM into the module's repository.
-#   #
-#   git_email: root@localhost.localdomain
 #   #
 #   # Verbose
 #   #   Whether to turn on debug logging
@@ -142,8 +128,10 @@ class SimpRpmHelper
   DEFAULT_BARE_REPOS_DIR = '/usr/share/simp/git/puppet_modules'
   DEFAULT_WORK_DIR = '/var/lib/simp-adapter'
 
-  DEFAULT_GIT_AUTHOR = PROGRAM_NAME
-  DEFAULT_GIT_EMAIL = 'root@localhost.localdomain'
+  # Git author/committer info used for all Git operations on
+  # the created/updated module Git repo
+  GIT_AUTHOR = PROGRAM_NAME
+  GIT_EMAIL = ''
 
   # key is --rpm_section, value is an array whose index corresponds
   # to the integer representation of --rpm_status.  At each index
@@ -231,10 +219,10 @@ class SimpRpmHelper
           "Failed to add updated content to #{@work_repo_dir}")
 
         commit_cmd = [
-          "GIT_COMMITTER_NAME='#{@options.git_author}'",
-          "GIT_COMMITTER_EMAIL='#{@options.git_email}'",
+          "GIT_COMMITTER_NAME='#{GIT_AUTHOR}'",
+          "GIT_COMMITTER_EMAIL='#{GIT_EMAIL}'",
           "#{@git} commit",
-          "--author='#{@options.git_author} <#{@options.git_email}>'",
+          "--author='#{GIT_AUTHOR} <#{GIT_EMAIL}>'",
           "-m 'Imported version #{@module_version}'"
         ].join(' ')
         execute(commit_cmd, "Failed to add updated content to #{@work_repo_dir}")
@@ -448,26 +436,6 @@ class SimpRpmHelper
       end
 
       opts.on(
-        '-a AUTHOR',
-        '--git_author AUTHOR',
-        'The (non-empty) author to use for commits',
-        'to the module Git repo.',
-        "    Default: #{DEFAULT_GIT_AUTHOR}"
-      ) do |arg|
-        @options.git_author = arg.strip
-      end
-
-      opts.on(
-        '-e EMAIL',
-        '--git_email EMAIL',
-        'The email address to use for commits',
-        'to the module Git repo.',
-        "    Default: #{DEFAULT_GIT_EMAIL}"
-      ) do |arg|
-        @options.git_email = arg.strip
-      end
-
-      opts.on(
         '-v',
         '--verbose',
         'Print out debug info when processing.'
@@ -529,8 +497,6 @@ class SimpRpmHelper
   def process_config_file
     # defaults
     config = {
-      'git_author' => DEFAULT_GIT_AUTHOR,
-      'git_email'  => DEFAULT_GIT_EMAIL,
       'target_dir' => DEFAULT_BARE_REPOS_DIR,
       'work_dir'   => DEFAULT_WORK_DIR,
       'verbose'    => false
@@ -557,16 +523,6 @@ class SimpRpmHelper
       msg = "Config file '#{@options.config_file}' does not exist"
       raise SimpRpmHelper::ConfigError.new(msg)
     end
-
-    if @options.git_author.nil?
-      if config['git_author'].empty?
-        msg = "'git_author' in '#{@options.config_file}' cannot be empty"
-        raise SimpRpmHelper::ConfigError.new(msg)
-      end
-      @options.git_author = config['git_author']
-    end
-
-    @options.git_email = config['git_email'] if @options.git_email.nil?
 
     if @options.target_dir.nil?
       unless config['target_dir'][0].chr == '/'
@@ -638,8 +594,8 @@ class SimpRpmHelper
         debug("Tagging version #{@module_version}")
         tag_msg = "Version #{@module_version} tagged by #{PROGRAM_NAME} #{VERSION}"
         tag_cmd = [
-          "GIT_COMMITTER_NAME='#{@options.git_author}'",
-          "GIT_COMMITTER_EMAIL='#{@options.git_email}'",
+          "GIT_COMMITTER_NAME='#{GIT_AUTHOR}'",
+          "GIT_COMMITTER_EMAIL='#{GIT_EMAIL}'",
           "#{@git} tag -a -f",
           @module_version,
           "-m '#{tag_msg}'"
@@ -818,12 +774,6 @@ class SimpRpmHelper
       @options.work_dir = File.expand_path(@options.work_dir)
     end
 
-    if @options.git_author
-      if @options.git_author.empty?
-        msg = "'git_author' cannot be empty"
-        raise SimpRpmHelper::ConfigError.new(msg)
-      end
-    end
   end
 
 
