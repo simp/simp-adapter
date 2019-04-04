@@ -1,5 +1,7 @@
 require 'spec_helper_acceptance'
 
+TEST_RVM_VERSION = (ENV.key?('TEST_RVM_VERSION') ? ENV['TEST_RVM_VERSION'] : '2.4.5')
+
 test_name 'simp-adapter'
 # This test uses 3 of the 4 test module RPMs:
 # - pupmod-simp-beakertest-0.0.1-0.noarch.rpm
@@ -67,9 +69,9 @@ describe 'simp-adapter' do
       on(hosts,'chown -R build_user:build_user /home/build_user/simp-adapter')
 
       step '[prep] Install rvm for build_user'
-      # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-      # RVM INSTALL STEPS LIFTED FROM simp-core DOCKER FILES USED FOR ISO BUILDING
-      # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+      # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+      # RVM INSTALL STEPS INITIALLY LIFTED FROM simp-core DOCKER FILES USED FOR ISO BUILDING
+      # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
       #
       # Do our best to get one of the keys from at one of the servers, and to
       # trust the right ones if the GPG keyservers return bad keys
@@ -95,12 +97,12 @@ describe 'simp-adapter' do
       on(hosts,'runuser build_user -l -c "for i in {1..5}; do { gpg2 --keyserver hkp://pgp.mit.edu --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3 || gpg2 --keyserver hkp://keys.gnupg.net --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3; } && { gpg2 --keyserver hkp://pgp.mit.edu --recv-keys 7D2BAF1CF37B13E2069D6956105BD0E739499BDB || gpg2 --keyserver hkp://keys.gnupg.net --recv-keys 7D2BAF1CF37B13E2069D6956105BD0E739499BDB; } && break || sleep 1; done"')
       on(hosts,'runuser build_user -l -c "gpg2 --refresh-keys"')
       on(hosts,'runuser build_user -l -c "curl -sSL https://raw.githubusercontent.com/rvm/rvm/stable/binscripts/rvm-installer -o rvm-installer && curl -sSL https://raw.githubusercontent.com/rvm/rvm/stable/binscripts/rvm-installer.asc -o rvm-installer.asc && gpg2 --verify rvm-installer.asc rvm-installer && bash rvm-installer"')
-      on(hosts,'runuser build_user -l -c "rvm install 2.4.4"')
+      on(hosts,"runuser build_user -l -c \"rvm install #{TEST_RVM_VERSION}\"")
 #     hosts.each do |host|
-#      retry_on(host,'runuser build_user -l -c "rvm install 2.4.4"', :max_retries => 5, :verbose => true.to_s)
+#      retry_on(host,"runuser build_user -l -c \"rvm install #{TEST_RVM_VERSION}\"", :max_retries => 5, :verbose => true.to_s)
 #     end
-      on(hosts,'runuser build_user -l -c "rvm use --default 2.4.4"')
-      on(hosts,'runuser build_user -l -c "rvm all do gem install bundler -v \"~> 1.16\""')
+      on(hosts,"runuser build_user -l -c \"rvm use --default #{TEST_RVM_VERSION}\"")
+      on(hosts,'runuser build_user -l -c "rvm all do gem install bundler -v \"~> 1.17\""')
 
       step '[prep] Build simp-adapter RPM'
       on(hosts,'runuser build_user -l -c "cd simp-adapter; git init"') # git project required for pkg:rpm

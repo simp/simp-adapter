@@ -2,6 +2,16 @@ $: << File.expand_path(File.join(File.dirname(__FILE__), '..','..','..', 'tests'
 require 'spec_helper'
 require 'simp_rpm_helper'
 require 'tmpdir'
+require 'yaml'
+
+############################################################################
+# Most of simp_rpm_helper's processing is tested in the acceptance test,
+# where simp_rpm_helper is called during module RPM installs, upgrades,
+# uninstalls, and reinstalls in the %pre, %preun, %post|%posttrans, and
+# %postun RPM sections. (Run `rpm -qp <test rpm name> --scripts` to see
+# exactly how simp_adapter_rpm is called in each scriptlet).  The unit
+# tests in this file fill in gaps in test coverage.
+############################################################################
 
 # simp_rpm_helper, as a ruby script with a puppet-provided vendor ruby as a shebang
 #   was difficult or impossible to test, so there was as symlink created in the
@@ -14,13 +24,9 @@ describe 'SimpRpmHelper' do
   let(:script) { 'simp_rpm_helper.rb'}
 
   let(:files_dir) { File.join(File.dirname(__FILE__), 'files') }
-
-  let(:mock_puppet_config) {
-    <<-EOM
-user = puppet
-group = 'puppet
-codedir = /etc/puppetlabs/code/
-   EOM
+  let(:module_src_dir) {
+    fixtures_dir = File.expand_path(File.join(File.dirname(__FILE__), '..', '..', 'fixtures'))
+    File.join(fixtures_dir,'test_module_rpms', 'pupmod-simp-beakertest-0.0.3' )
   }
 
   let(:usage) {
@@ -38,7 +44,7 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
                                      be '2' for an upgrade and '1' for an
                                      initial install.
     -f, --config CONFIG_FILE         The configuration file overriding defaults.
-                                         Default: /etc/simp/adapter_config.yaml
+                                         Default: /etc/simp/adapter_conf.yaml
     -t, --target_dir DIR             The fully qualified path to the parent
                                      directory of the module Git repository.
                                      This repository will be created/updated
@@ -47,28 +53,26 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
                                          /usr/share/simp/git/puppet_modules
     -w, --work_dir DIR               The fully qualified path for a temporary
                                      work directory.
-                                         Default: /var/lib/simp-adapter/git
+                                         Default: /var/lib/simp-adapter
     -a, --git_author AUTHOR          The (non-empty) author to use for commits
                                      to the module Git repo.
                                          Default: #{script}
     -e, --git_email EMAIL            The email address to use for commits
                                      to the module Git repo.
-                                         Default: root@#{`hostname -f`.strip}
+                                         Default: root@localhost.localdomain
     -v, --verbose                    Print out debug info when processing.
     -h, --help                       Help Message
     EOM
   }
+
 
   describe 'run' do
     before :each do
       @helper = SimpRpmHelper.new
     end
 
-    context 'success cases' do
-
+    context 'help option' do
       it 'should print help' do
-# TODO re-enable when R10k option is added to simp_rpm_helper
-#        allow(@helper).to receive(:`).with('puppet config --section master print').and_return(mock_puppet_config)
         expect{ @helper.run(['-h']) }.to output(usage).to_stdout
         expect( @helper.run(['-h']) ).to eq(0)
       end
@@ -81,7 +85,6 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
 
 #{usage.strip}
         EOF
-#        allow(@helper).to receive(:`).with('puppet config --section master print').and_return(mock_puppet_config)
         expect{ @helper.run(['-x']) }.to output(expected).to_stderr
         expect( @helper.run(['-x']) ).to eq(1)
       end
@@ -202,19 +205,166 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
 
     end
 
+    context 'config file defaults exist' do
+      # Will use the posttrans install operation for these tests,
+      # as it is the operation that uses all of the default config
+      # values
+
+      before :each do
+        @tmp_dir  = Dir.mktmpdir( File.basename(__FILE__))
+      end
+
+      after :each do
+        FileUtils.remove_entry_secure @tmp_dir
+      end
+
+      it 'should use defaults for unspecified options' do
+        config = {
+          'target_dir' => File.join(@tmp_dir, 'repos'),
+          'work_dir'   => File.join(@tmp_dir, 'work_dir'),
+          'git_author' => 'testauthor',
+          'git_email'  => 'testauthor@test.domain',
+          'verbose'    => true
+        }
+        config_file = File.join(@tmp_dir, 'adapter_conf.yaml')
+        File.open(config_file, 'w') { |file| file.puts config.to_yaml }
+
+        args = [
+          '-d', module_src_dir,
+          '-s', 'posttrans',
+          '-S', '1',
+          '-f', config_file
+        ]
+        one_verbose_msg = /Repo update completed/ # spot check one of the verbose messages
+        expect{ @helper.run(args) }.to output(one_verbose_msg).to_stdout
+
+        expect(File).to exist(config['target_dir'])
+        module_repo_dir = File.join(config['target_dir'], 'simp-beakertest.git')
+        expect(File).to exist(module_repo_dir)
+        expect(File).to exist(config['work_dir'])
+        expect(Dir.glob("#{config['work_dir']}/*")). to be_empty
+
+        Dir.chdir(config['work_dir'])  { `git clone file:///#{module_repo_dir}` }
+        Dir.chdir(File.join(config['work_dir'], 'simp-beakertest')) do
+          regex = /Author: #{config['git_author']} <#{config['git_email']}>/
+          expect(`git log`).to match(regex)
+        end
+      end
+
+      it 'should use command line options in lieu of defaults' do
+        config = {
+          'target_dir' => File.join(@tmp_dir, 'repos1'),
+          'work_dir'   => File.join(@tmp_dir, 'work_dir1'),
+          'git_author' => 'testauthor1',
+          'git_email'  => 'testauthor1@test.domain',
+          'verbose'    => false
+        }
+        config_file = File.join(@tmp_dir, 'adapter_conf.yaml')
+        File.open(config_file, 'w') { |file| file.puts config.to_yaml }
+
+        override_repos_dir = File.join(@tmp_dir, 'repos2')
+        override_work_dir  = File.join(@tmp_dir, 'work_dir2')
+        override_author    = 'testauthor2'
+        override_email     = 'testauthor2@test.domain'
+        args = [
+          '-d', module_src_dir,
+          '-s', 'posttrans',
+          '-S', '1',
+          '-f', config_file,
+          '-t', override_repos_dir,
+          '-w', override_work_dir,
+          '-a', override_author,
+          '-e', override_email,
+          '-v'
+        ]
+        one_verbose_msg = /Repo update completed/ # spot check one of the verbose messages
+        expect{ @helper.run(args) }.to output(one_verbose_msg).to_stdout
+
+        expect(File).to exist(override_repos_dir)
+        module_repo_dir = File.join(override_repos_dir, 'simp-beakertest.git')
+        expect(File).to exist(module_repo_dir)
+        expect(File).to exist(override_work_dir)
+
+        Dir.chdir(override_work_dir)  { `git clone file:///#{module_repo_dir}` }
+        Dir.chdir(module_repo_dir) do
+          regex = /Author: #{override_author} <#{override_email}>/
+          expect(`git log`).to match(regex)
+        end
+      end
+    end
+
+    context 'other failures' do
+      let(:git_cmd) {  Facter::Core::Execution.which('git') }
+
+      before :each do
+        @tmp_dir  = Dir.mktmpdir( File.basename(__FILE__))
+        @config = {
+          'target_dir' => File.join(@tmp_dir, 'repos'),
+          'work_dir'   => File.join(@tmp_dir, 'work_dir'),
+          #'verbose'    => true
+        }
+        @config_file = File.join(@tmp_dir, 'adapter_conf.yaml')
+        File.open(@config_file, 'w') { |file| file.puts @config.to_yaml }
+        @module_repo_dir = File.join(@config['target_dir'], 'simp-beakertest.git')
+      end
+
+      after :each do
+        FileUtils.remove_entry_secure @tmp_dir
+      end
+
+      it 'should fail when git init fails' do
+        cmd = "#{git_cmd} init --bare #{@module_repo_dir}"
+        err_msg = "Failed to create git repo at #{@module_repo_dir}"
+        allow(@helper).to receive(:execute).with(cmd,err_msg).and_raise(SimpRpmHelper::CommandError, err_msg)
+        args = [
+          '-d', module_src_dir,
+          '-s', 'posttrans',
+          '-S', '1',
+          '-f', @config_file
+        ]
+        expect( @helper.run(args) ).to eq 2
+      end
+
 =begin
-    context 'git operation error cases' do
-#TODO flesh out these error cases
-      it 'should fail if xxx git operation fails' do
-      end
-    end
+simp_rpm_helper is not currently written in a way that allows testing
+of the failure cases below, even with mocking.  This deficiency can be
+addressed when this software is refactored into a library (Gem). In the
+interim, we will **ASSUME** that the SimpRpmHelper#execute() failure cases
+below are adequate:
+- Each of these operations are affected by a call to SimpRpmHelper#execute
+- The 'should fail when git init fails' test verifies that the exception
+  raised by SimpRpmHelper#execute is appropriately caught and translated
+  into a non-zero return code.
 
-    context 'other error cases' do
-# TODO re-enable when R10k option is added to simp_rpm_helper
-      it 'should fail if puppet group cannot be determined' do
-      end
-    end
+      pending 'should fail when git clone fails'
+      pending 'should fail when rsync fails'
+      pending 'should fail when git add fails'
+      pending 'should fail when git push to master fails'
+      pending 'should fail when git tag -a -f fails'
+      pending 'should fail when git push of tag fails'
 =end
+    end
+  end
 
+  describe 'execute' do
+    before :all do
+      @helper = SimpRpmHelper.new
+    end
+
+    it 'should return log hash upon success' do
+      result = @helper.execute('ls')
+      expect(result[:stdout]).to_not be_empty
+      expect(result[:stderr]).to be_empty
+    end
+
+    it 'should fail when command fails' do
+      expect { @helper.execute('ls /does/not/exist')}.to raise_error(
+      SimpRpmHelper::CommandError, /ls: cannot access/)
+    end
+
+    it 'should fail with specified message title when command fails' do
+      expect { @helper.execute('ls /does/not/exist', 'Failed to find required dir')}.
+        to raise_error(SimpRpmHelper::CommandError, /Failed to find required dir/)
+    end
   end
 end

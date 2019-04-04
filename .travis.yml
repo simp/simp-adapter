@@ -11,6 +11,7 @@
 # SIMP 6.3      5.5      2.4.4  TBD***
 # PE 2018.1     5.5      2.4.4  2020-05 (LTS)***
 # PE 2019.0     6.0      2.5.1  2019-08-31^^^
+# SIMP 6.4      5.5      2.4.5  TBD***
 #
 # *** = Modules created for SIMP 6.3+ are not required to support Puppet < 5.5
 # ^^^ = SIMP doesn't support 6 yet; tests are info-only and allowed to fail
@@ -35,10 +36,11 @@ addons:
   apt:
     packages:
       - rpm
+      - rsync
 
 before_install:
   - rm -f Gemfile.lock
-  - gem install -v '~> 1.16' bundler
+  - gem install -v '~> 1.17' bundler
 
 jobs:
   allow_failures:
@@ -47,7 +49,7 @@ jobs:
   include:
     - stage: check
       name: 'Syntax, style, and validation checks'
-      rvm: 2.4.4
+      rvm: 2.4.5
       env: PUPPET_VERSION="~> 5"
       script:
         - bundle exec rake pkg:compare_latest_tag
@@ -60,15 +62,8 @@ jobs:
         - bundle exec rake spec
 
     - stage: spec
-      rvm: 2.4.4
-      name: 'Puppet 5.5 (SIMP 6.3, PE 2018.1)'
-      env: PUPPET_VERSION="~> 5.5.0"
-      script:
-        - bundle exec rake spec
-
-    - stage: spec
       name: 'Latest Puppet 5.x'
-      rvm: 2.4.4
+      rvm: 2.4.5
       env: PUPPET_VERSION="~> 5.0"
       script:
         - bundle exec rake spec
@@ -81,7 +76,7 @@ jobs:
         - bundle exec rake spec
 
     - stage: deploy
-      rvm: 2.4.4
+      rvm: 2.4.5
       script:
         - true
       before_deploy:

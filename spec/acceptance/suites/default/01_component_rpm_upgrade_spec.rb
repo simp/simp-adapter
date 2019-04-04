@@ -94,12 +94,12 @@ describe 'simp-adapter in RPM upgrade/downgrade' do
         it 'should keep history of version changes in git log' do
           on(host, 'rm -rf /root/simp-beakertest*')
           on(host, "git clone #{mod_repo_url} simp-beakertest")
-          result = on(host, 'cd simp-beakertest; git log --pretty=format:"%s"')
+          result = on(host, 'cd simp-beakertest; git log --pretty=format:"%an %ae %s"')
 
           expected = [
-            "Imported version #{version1}",  # downgrade
-            "Imported version #{version2}",  # upgrade
-            "Imported version #{version1}",  # initial install
+            "simp_rpm_helper root@localhost.localdomain Imported version #{version1}",  # downgrade
+            "simp_rpm_helper root@localhost.localdomain Imported version #{version2}",  # upgrade
+            "simp_rpm_helper root@localhost.localdomain Imported version #{version1}",  # initial install
           ].join("\n")
 
           expect(result.stdout.strip).to eq expected
