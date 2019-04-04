@@ -256,6 +256,16 @@ puppet config set digest_algorithm sha256 || :
   fi
 )
 
+%posttrans
+# When upgrading from simp-adapter < 1.0.0, if the user has modified
+# the old configuration file for the simp-adapter, rpm will save it
+# off with a suffix '.rpmsave', because that file was marked as
+# '%config(noreplace)'. The old config is not applicable to the
+# current simp-adapter (wrong filename and content), so remove it.
+if [ -f "/etc/simp/adapter_config.yaml.rpmsave" ]; then
+  rm -f /etc/simp/adapter_config.yaml.rpmsave
+fi
+
 %changelog
 * Tue Apr 02 2019 Liz Nemsick <lnemsick.simp@gmail.com> -  1.0.0-0
 - Reworked simp_rpm_helper to install a module's content into a
