@@ -3,7 +3,7 @@
 Summary: SIMP Adapter for the AIO Puppet Installation
 Name: simp-adapter
 Version: 1.0.0
-Release: 0%{?dist}
+Release: Alpha%{?dist}
 License: Apache-2.0
 Group: Applications/System
 Source: %{name}-%{version}-%{release}.tar.gz
@@ -109,6 +109,49 @@ install -p -m 640 -D src/conf/adapter_conf.yaml %{buildroot}%{prefix}/adapter_co
 %defattr(-,root,root,-)
 %config(noreplace) %{prefix}/adapter_conf.yaml
 /usr/local/sbin/simp_rpm_helper
+
+%pre
+if [ $1 -eq 2 ]; then
+  # This is an upgrade.
+  #
+  # Older versions of simp-adapter provide a global Hiera 3 configuration file
+  # that may be in use at the time this version is installed.  With the move to
+  # environment-specific Hiera configuration (beginning with SIMP-6.3.0), that
+  # file, '/etc/puppetlabs/puppet/hiera.yaml.simp' is no longer packaged in
+  # simp-adapter and will be automatically *removed* by rpm on upgrade. Since we
+  # do not want users to lose configuration, we will save off that file before
+  # it is removed and then restore it in the %posttrans below.
+  #
+  # The backup of 'hiera.yaml.simp' seems simple enough, but is complicated
+  # by the following issues:
+  # (1) The older versions of simp-adapter actually created a soft link
+  #     of 'hiera.yaml.simp' to the global 'hiera.yaml'.
+  # (2) The 0.0.6 -> 0.x.y. upgrade of simp-adapter requires a puppet-agent
+  #     upgrade as part of the transaction.
+  # (3) The puppet-agent RPM also tries to manage the global 'hiera.yaml'.
+  #     In a puppet-agent RPM upgrade, the puppet-agent saves off (literally
+  #     renames) the global 'hiera.yaml' to 'hiera.yaml.pkg-old' in its %pre
+  #     and then restores in its %posttrans.
+  # (4) If the %posttrans of puppet-agent runs before that of the simp-adapter,
+  #     the puppet-agent upgrade doesn't restore the pre-existing 'hiera.yaml'
+  #     because it is a link and the link was broken by the removal of
+  #     'hiera.yaml.simp'.
+  #
+  # We workaround all these issues here and in the %posttrans.
+  #
+  # NOTE: Although this logic is intended for the simp-adapter 0.0.6 to 0.x.y
+  # upgrade, it will also run for any later simp-adapter upgrade for which a
+  # puppet-agent upgrade is also required.  It *should* work in that case,
+  # as well, despite not being necessary.
+  cd %{puppet_confdir}
+
+  # For the upgrade scenario of interest, we are in the middle of the
+  # transaction and need to check for the interim hiera.yaml file from the
+  # puppet-agent %pre.
+  if [ -h "hiera.yaml.pkg-old" ] &&  [ "$(readlink hiera.yaml.pkg-old)" = "hiera.yaml.simp" ] && [ -f "hiera.yaml.simp" ]; then
+    cp -a hiera.yaml.simp hiera.yaml.simp.rpm_upgrade_bak
+  fi
+fi
 
 %post
 # Post installation stuff
@@ -244,6 +287,27 @@ puppet config set digest_algorithm sha256 || :
 
 (
   if [ $1 -eq 0 ]; then
+    # Previous versions of simp-adapter (0.0.6 and earlier)
+    #   1) Installed a hiera.yaml.simp file
+    #   2) Moved any initial hiera.yaml file to hiera.yaml.simpbak
+    #   3) Created a link called hiera.yaml to hiera.yaml.simp
+    #
+    # So, if this is uninstall of simp-adapter, we are going to clean up most
+    # of the residual cruft from an earlier simp-adapter, if present. However,
+    # we are intentionally going to leave 'hiera.yaml.simpbak' alone.  We
+    # could move that file back to 'hiera.yaml', if no 'hiera.yaml' exists.
+    # Alternatively, we could remove 'hiera.yaml.simpbak'.  Both of those
+    # operations seems too aggressive.  Instead, we are going to leave what
+    # may be an OBE file in place, rather than to arbitrarily change Puppet
+    # global configuration.
+    cd %{puppet_confdir}
+
+    if [ -h "hiera.yaml" ] &&  [ "$(readlink hiera.yaml)" = "hiera.yaml.simp" ]; then
+      rm hiera.yaml
+    fi
+
+    rm -f hiera.yaml.simp
+
     # Remove the working directory of simp-adapter, which is used by
     # simp_rpm_helper.  To be sure we have all artifacts, we will remove
     # both the default directory and the configured directory.
@@ -257,6 +321,38 @@ puppet config set digest_algorithm sha256 || :
 )
 
 %posttrans
+# This strange but necessary logic is require to handle the second part of a
+# simp-adapter upgrade workaround initiated in %pre for a specific use case.
+# See %pre comments for details.
+(
+  cd %{puppet_confdir}
+
+  if [ -f "hiera.yaml.simp.rpm_upgrade_bak" ]; then
+    if [ -e "hiera.yaml.simp" ]; then
+      # Backup was not necessary
+      rm  hiera.yaml.simp.rpm_upgrade_bak
+    else
+      # Restore the saved off Hiera 3 'hiera.yaml.simp'
+      mv  hiera.yaml.simp.rpm_upgrade_bak hiera.yaml.simp
+    fi
+  fi
+
+  if [ -h "hiera.yaml.pkg-old" ] &&  [ "$(readlink hiera.yaml.pkg-old)" = "hiera.yaml.simp" ]  && [ -e "hiera.yaml.simp" ]; then
+    # We get here when 'hiera.yaml.simp' is removed by a simp-adapter upgrade
+    # (0.0.6 to 0.x.y upgrades only), a puppet-agent upgrade is part of the
+    # transaction, and the %posttrans of puppet-agent runs before that of the
+    # simp-adapter.
+    #
+    # In this case, the puppet-agent upgrade doesn't restore the pre-existing
+    # 'hiera.yaml' because it is broken link to 'hiera.yaml.simp'. Specifically,
+    # the puppet-agent %posttrans executes an '-e' test on 'hiera.yaml.pkg-old'
+    # and, because that test returns false (can't dereference a broken link),
+    # does *not* move 'hiera.yaml.pkg-old' to 'hiera.yaml'. We have to
+    # finish the puppet-agent restore ourselves.
+    mv hiera.yaml.pkg-old hiera.yaml
+  fi
+)
+
 # When upgrading from simp-adapter < 1.0.0, if the user has modified
 # the old configuration file for the simp-adapter, rpm will save it
 # off with a suffix '.rpmsave', because that file was marked as
@@ -267,17 +363,13 @@ if [ -f "/etc/simp/adapter_config.yaml.rpmsave" ]; then
 fi
 
 %changelog
-* Tue Apr 02 2019 Liz Nemsick <lnemsick.simp@gmail.com> -  1.0.0-0
+* Tue Apr 02 2019 Liz Nemsick <lnemsick.simp@gmail.com> -  1.0.0
 - Reworked simp_rpm_helper to install a module's content into a
   SIMP-managed, bare Git repository, instead of a 'simp' environment
   (/var/puppetlabs/code/environments/simp), during a module RPM
   install/upgrade.  See the comment block header in
   /usr/local/sbin/simp_rpm_helper for more detailed information about
   the new behavior and configuration.
-- Removed simp-adapter's special RPM upgrade/erase logic for handling
-  of the global, Hiera 3 file (/etc/puppetlabs/puppet/hiera.yaml.simp)
-  that simp-adapter <= 0.0.6 delivered and linked to
-  /etc/puppetlabs/puppet/hiera.yaml.
 
 * Fri Dec 07 2018 Liz Nemsick <lnemsick.simp@gmail.com> -  0.1.1-0
 - Affect a copy with simp_rpm_helper when called in either the %posttrans
