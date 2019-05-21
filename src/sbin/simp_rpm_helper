@@ -436,6 +436,13 @@ class SimpRpmHelper
       end
 
       opts.on(
+        '-p',
+        '--preserve',
+        "DEPRECATED. This option is no longer used."
+      ) do |arg|
+      end
+
+      opts.on(
         '-v',
         '--verbose',
         'Print out debug info when processing.'

@@ -2,8 +2,8 @@
 
 Summary: SIMP Adapter for the AIO Puppet Installation
 Name: simp-adapter
-Version: 1.0.0
-Release: Alpha%{?dist}
+Version: 1.0.1
+Release: 0%{?dist}
 License: Apache-2.0
 Group: Applications/System
 Source: %{name}-%{version}-%{release}.tar.gz
@@ -363,6 +363,12 @@ if [ -f "/etc/simp/adapter_config.yaml.rpmsave" ]; then
 fi
 
 %changelog
+* Tue May 21 2019 Liz Nemsick <lnemsick.simp@gmail.com> -  1.0.1
+- Accept deprecated '--preserve' option in simp_rpm_helper.  This
+  option no longer does anything, but allows the simp-environment
+  package to be upgraded to the simp-environment-skeleton package
+  without simp_rpm_helper errors.
+
 * Tue Apr 02 2019 Liz Nemsick <lnemsick.simp@gmail.com> -  1.0.0
 - Reworked simp_rpm_helper to install a module's content into a
   SIMP-managed, bare Git repository, instead of a 'simp' environment
