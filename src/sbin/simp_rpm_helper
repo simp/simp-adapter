@@ -762,12 +762,9 @@ class SimpRpmHelper
     end
 
     if @options.target_dir
-      unless @options.target_dir.chr == '/'
-        msg ="'target_dir' must be an absolute path"
-        raise SimpRpmHelper::ConfigError.new(msg)
-      end
-
-      # clean up any relative sub-paths for tidier logging
+      # For backward compatibility, we don't actually enforce the
+      # fully qualified path.  However, we still want to clean up
+      # any relative sub-paths for tidier logging.
       @options.target_dir = File.expand_path(@options.target_dir)
     end
 

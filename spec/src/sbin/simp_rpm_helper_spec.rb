@@ -145,12 +145,6 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
         expect( @helper.run(['--rpm_dir=/var', '--rpm_section=preun', '--rpm_status=a']) ).to eq(1)
       end
 
-      it 'should fail if target_dir option is not an absolute path' do
-        expected = "#{script} ERROR: 'target_dir' must be an absolute path\n"
-        expect{ @helper.run(['--rpm_dir=/var', '--rpm_section=posttrans', '--rpm_status=1', '--target_dir=oops']) }.to output(expected).to_stderr
-        expect( @helper.run(['--rpm_dir=/var', '--rpm_section=posttrans', '--rpm_status=1', '--target_dir=oops']) ).to eq(1)
-      end
-
       it 'should fail if work_dir option is not an absolute path' do
         expected = "#{script} ERROR: 'work_dir' must be an absolute path\n"
         expect{ @helper.run(['--rpm_dir=/var', '--rpm_section=posttrans', '--rpm_status=1', '--work_dir=oops']) }.to output(expected).to_stderr
