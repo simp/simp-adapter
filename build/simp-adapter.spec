@@ -2,8 +2,8 @@
 
 Summary: SIMP Adapter for the AIO Puppet Installation
 Name: simp-adapter
-Version: 1.0.0
-Release: Alpha%{?dist}
+Version: 1.0.1
+Release: 0
 License: Apache-2.0
 Group: Applications/System
 Source: %{name}-%{version}-%{release}.tar.gz
@@ -16,28 +16,13 @@ Prefix: %{_sysconfdir}/simp
 Requires: git
 Requires: rsync
 
-# %post uses /opt/puppetlabs/bin/puppet
 # %postun uses /opt/puppetlabs/puppet/bin/ruby
-Requires(post,postun): puppet-agent
-
-Requires(post): puppetserver
-Requires(post): puppetdb
-%{?el6:Requires(post): procps}
-%{?el7:Requires(post): procps-ng}
+Requires(postun): puppet-agent
 
 # simp_rpm_helper uses /opt/puppetlabs/puppet/bin/ruby, a more current
 # and thus more capable Ruby than is provided by the OS (esp. on el6)
-Requires: puppet-agent < 6.0.0
-Requires: puppet-agent >= 5.5.6
+Requires: puppet-agent >= 5.5.7
 
-Requires: puppet-client-tools < 2.0.0
-Requires: puppet-client-tools >= 1.2.4
-Requires: puppetdb < 6.0.0
-Requires: puppetdb >= 5.2.4
-Requires: puppetdb-termini < 6.0.0
-Requires: puppetdb-termini >= 5.2.4
-Requires: puppetserver < 6.0.0
-Requires: puppetserver >= 5.3.5
 Provides: simp-adapter = %{version}
 Provides: simp-adapter-foss = %{version}
 
@@ -49,36 +34,20 @@ License: Apache-2.0
 Requires: git
 Requires: rsync
 
-# %post uses /opt/puppetlabs/bin/puppet
 # %postun uses /opt/puppetlabs/puppet/bin/ruby
-Requires(post,postun): puppet-agent
-
-Requires(post): pe-puppetserver
-Requires(post): pe-puppetdb
-%{?el6:Requires(post): procps}
-%{?el7:Requires(post): procps-ng}
+Requires(postun): puppet-agent
 
 # simp_rpm_helper uses /opt/puppetlabs/puppet/bin/ruby, a more current
 # and thus more capable Ruby than is provided by the OS (esp. on el6)
-Requires: puppet-agent < 6.0.0
-Requires: puppet-agent >= 5.5.6
-Requires: pe-client-tools >= 18.0.0
-Requires: pe-puppetdb < 6.0.0
-Requires: pe-puppetdb >= 5.2.4
-Requires: pe-puppetdb-termini < 6.0.0
-Requires: pe-puppetdb-termini >= 5.2.4
-Requires: pe-puppetserver >= 2018.1.0
+Requires: puppet-agent >= 5.5.10
 Provides: simp-adapter = %{version}
 Provides: simp-adapter-pe = %{version}
 
 %description
-An adapter RPM for creating/updating local Puppet module Git repositories
-and gluing together a SIMP version with the AIO Puppet installation.
+An adapter RPM for creating/updating local Puppet module Git repositories.
 
 %description pe
-An adapter RPM for creating/updating local Puppet module Git repositories
-and gluing together a SIMP version with the Puppet Enterprise Puppet
-installation.
+An adapter RPM for creating/updating local Puppet module Git repositories.
 
 %prep
 %setup -q
@@ -94,13 +63,6 @@ install -p -m 640 -D src/conf/adapter_conf.yaml %{buildroot}%{prefix}/adapter_co
 [ "%{buildroot}" != "/" ] && rm -rf %{buildroot}
 
 %files
-#
-# TODO: Many of the hard-coded users and groups are likely to break when using
-#       PE, which has different service, user, and group names:
-#
-#  - https://docs.puppet.com/pe/2016.4/install_what_and_where.html#user-accounts-installed
-#  - https://docs.puppet.com/pe/2016.4/install_what_and_where.html#group-accounts-installed
-#
 %defattr(-,root,root,-)
 %config(noreplace) %{prefix}/adapter_conf.yaml
 /usr/local/sbin/simp_rpm_helper
@@ -158,127 +120,6 @@ fi
 # when $1 = 1, this is an install
 # when $1 = 2, this is an upgrade
 
-PATH=$PATH:/opt/puppetlabs/bin
-
-id -u 'pe-puppet' &> /dev/null
-if [ $? -eq 0 ]; then
-  puppet_user='pe-puppet'
-  puppet_group='pe-puppet'
-  puppetdb_user='pe-puppetdb'
-  puppetdb_group='pe-puppetdb'
-else
-  puppet_user='puppet'
-  puppet_group='puppet'
-  puppetdb_user='puppetdb'
-  puppetdb_group='puppetdb'
-fi
-
-if [ "${puppet_user}" == 'puppet' ]; then
-  # This fix is Puppet Open Source Only
-  #
-  # This is here due to a bug in the Puppet Server RPM that does not properly
-  # nail up the Puppet UID and GID to 52
-  #
-  # Unfortunately, we can't guarantee order in 'post', so we may have to munge up
-  # the filesystem pretty hard
-
-  puppet_owned_dirs='/opt/puppetlabs /etc/puppetlabs /var/log/puppetlabs /var/run/puppetlabs'
-
-  puppet_uid=`id -u puppet 2>/dev/null`
-  puppet_gid=`id -g puppet 2>/dev/null`
-
-  restart_puppetserver=0
-
-  if [ -n $puppet_gid ]; then
-    if [ "$puppet_gid" != '52' ]; then
-
-      if `pgrep -f puppetserver &>/dev/null`; then
-        puppet resource service puppetserver ensure=stopped || :
-        wait
-        restart_puppetserver=1
-      fi
-
-      groupmod -g 52 puppet || :
-
-      for dir in $puppet_owned_dirs; do
-        if [ -d $dir ]; then
-          find $dir -gid $puppet_gid -exec chgrp puppet {} \;
-        fi
-      done
-    fi
-  else
-    # Add puppet group
-    groupadd -r -g 52 puppet || :
-  fi
-
-  if [ -n $puppet_uid ]; then
-    if [ "$puppet_uid" != '52' ]; then
-
-      if `pgrep -f puppetserver &>/dev/null`; then
-        puppet resource service puppetserver ensure=stopped  || :
-        wait
-        restart_puppetserver=1
-      fi
-
-      usermod -u 52 puppet || :
-
-      for dir in $puppet_owned_dirs; do
-        if [ -d $dir ]; then
-          find $dir -uid $puppet_uid -exec chown puppet {} \;
-        fi
-      done
-    fi
-  else
-    # Add puppet user
-    useradd -r --uid 52 --gid puppet --home /opt/puppetlabs/server/data/puppetserver --shell $(which nologin) --comment "puppetserver daemon" puppet || :
-  fi
-
-  if [ $restart_puppetserver -eq 1 ]; then
-    puppet resource service puppetserver ensure=running
-  fi
-
-  # PuppetDB doesn't have a set user and group, but we really want to make sure
-  # that the directory permissions aren't awful
-
-  # Add puppet group
-  getent group puppetdb > /dev/null || groupadd -r puppetdb || :
-
-  # Add puppet user
-  getent passwd puppetdb > /dev/null || useradd -r --gid puppetdb --home /opt/puppetlabs/server/data/puppetdb --shell $(which nologin) --comment "puppetdb daemon" puppetdb || :
-fi
-# End Puppet Open Source permissions munging
-
-puppet config set digest_algorithm sha256 || :
-
-(
-  cd %{puppet_confdir}
-
-  # Only do permission fixes on a fresh install
-  if [ $1 -eq 1 ]; then
-    # Fix the permissions laid down by the puppet-agent, puppetserver
-    # and puppetdb RPMs
-    # https://tickets.puppetlabs.com/browse/PA-726
-    for dir in code puppet puppetserver pxp-agent; do
-      if [ -d $dir ]; then
-        chmod -R u+rwX,g+rX,g-w,o-rwx $dir
-        chmod ug+st $dir
-        chgrp -R $puppet_group $dir
-      fi
-    done
-
-    if [ -d 'puppet/ssl' ]; then
-      chmod -R u+rwX,g+rX,g-w,o-rwx 'puppet/ssl'
-      chmod ug+st 'puppet/ssl'
-      chown -R ${puppet_user}:${puppet_group} 'puppet/ssl'
-    fi
-
-    if [ -d 'puppetdb' ]; then
-      chmod -R u+rwX,g+rX,g-w,o-rwx 'puppetdb'
-      chmod ug+st 'puppetdb'
-      chgrp -R $puppetdb_group 'puppetdb'
-    fi
-  fi
-)
 
 %postun
 # Post uninstall stuff
@@ -363,6 +204,16 @@ if [ -f "/etc/simp/adapter_config.yaml.rpmsave" ]; then
 fi
 
 %changelog
+* Tue May 21 2019 Liz Nemsick <lnemsick.simp@gmail.com> -  1.0.1
+- Adjust simp_rpm_helper behavior to allows the simp-environment
+  package to be upgraded to the simp-environment-skeleton package
+  without simp_rpm_helper errors:
+  - Accept a deprecated '--preserve' option in simp_rpm_helper.  This
+    option no longer does anything.
+  - Disable verification that '--target_dir' is a fully-qualified path.
+- Remove OBE %post logic plus the RPM requires and distribution
+  release qualifier related to it.
+
 * Tue Apr 02 2019 Liz Nemsick <lnemsick.simp@gmail.com> -  1.0.0
 - Reworked simp_rpm_helper to install a module's content into a
   SIMP-managed, bare Git repository, instead of a 'simp' environment

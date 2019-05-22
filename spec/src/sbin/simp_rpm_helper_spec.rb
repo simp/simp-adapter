@@ -54,6 +54,7 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
     -w, --work_dir DIR               The fully qualified path for a temporary
                                      work directory.
                                          Default: /var/lib/simp-adapter
+    -p, --preserve                   DEPRECATED. This option is no longer used.
     -v, --verbose                    Print out debug info when processing.
     -h, --help                       Help Message
     EOM
@@ -144,12 +145,6 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
         expect( @helper.run(['--rpm_dir=/var', '--rpm_section=preun', '--rpm_status=a']) ).to eq(1)
       end
 
-      it 'should fail if target_dir option is not an absolute path' do
-        expected = "#{script} ERROR: 'target_dir' must be an absolute path\n"
-        expect{ @helper.run(['--rpm_dir=/var', '--rpm_section=posttrans', '--rpm_status=1', '--target_dir=oops']) }.to output(expected).to_stderr
-        expect( @helper.run(['--rpm_dir=/var', '--rpm_section=posttrans', '--rpm_status=1', '--target_dir=oops']) ).to eq(1)
-      end
-
       it 'should fail if work_dir option is not an absolute path' do
         expected = "#{script} ERROR: 'work_dir' must be an absolute path\n"
         expect{ @helper.run(['--rpm_dir=/var', '--rpm_section=posttrans', '--rpm_status=1', '--work_dir=oops']) }.to output(expected).to_stderr
@@ -213,7 +208,8 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
           '-d', module_src_dir,
           '-s', 'posttrans',
           '-S', '1',
-          '-f', config_file
+          '-f', config_file,
+          '--preserve',  # unused option should be ignored
         ]
         one_verbose_msg = /Repo update completed/ # spot check one of the verbose messages
         expect{ @helper.run(args) }.to output(one_verbose_msg).to_stdout
