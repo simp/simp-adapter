@@ -21,7 +21,7 @@ Requires(postun): puppet-agent
 
 # simp_rpm_helper uses /opt/puppetlabs/puppet/bin/ruby, a more current
 # and thus more capable Ruby than is provided by the OS (esp. on el6)
-Requires: puppet-agent >= 5.5.10
+Requires: puppet-agent >= 5.5.7
 
 Provides: simp-adapter = %{version}
 Provides: simp-adapter-foss = %{version}
