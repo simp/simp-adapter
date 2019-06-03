@@ -22,6 +22,10 @@ describe 'simp-adapter hiera.yaml ops' do
          step '[prep] Revert to old verson of simp-adapter'
          host.uninstall_package('simp-adapter')
          host.uninstall_package('puppet-agent')
+
+         # make sure test starts clean
+         on(host , 'rm -rf /etc/puppetlabs/puppet')
+
          host.install_package('simp-adapter-0.0.6')
          on(host, 'ls -l /etc/puppetlabs/puppet')
          # saving this off for later use

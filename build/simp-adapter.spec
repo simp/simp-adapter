@@ -1,6 +1,6 @@
 %define puppet_confdir /etc/puppetlabs/puppet
 
-Summary: SIMP Adapter for the AIO Puppet Installation
+Summary: SIMP Adapter
 Name: simp-adapter
 Version: 1.0.1
 Release: 0
@@ -25,28 +25,12 @@ Requires: puppet-agent >= 5.5.7
 
 Provides: simp-adapter = %{version}
 Provides: simp-adapter-foss = %{version}
-
-%package pe
-Summary: SIMP Adapter for the Puppet Enterprise Puppet Installation
-License: Apache-2.0
-
-# simp_rpm_helper uses git and rsync
-Requires: git
-Requires: rsync
-
-# %postun uses /opt/puppetlabs/puppet/bin/ruby
-Requires(postun): puppet-agent
-
-# simp_rpm_helper uses /opt/puppetlabs/puppet/bin/ruby, a more current
-# and thus more capable Ruby than is provided by the OS (esp. on el6)
-Requires: puppet-agent >= 5.5.10
-Provides: simp-adapter = %{version}
 Provides: simp-adapter-pe = %{version}
 
-%description
-An adapter RPM for creating/updating local Puppet module Git repositories.
+Obsoletes: simp-adapter-pe < 1.0.0
+Obsoletes: simp-adapter-foss < 1.0.0
 
-%description pe
+%description
 An adapter RPM for creating/updating local Puppet module Git repositories.
 
 %prep
@@ -63,11 +47,6 @@ install -p -m 640 -D src/conf/adapter_conf.yaml %{buildroot}%{prefix}/adapter_co
 [ "%{buildroot}" != "/" ] && rm -rf %{buildroot}
 
 %files
-%defattr(-,root,root,-)
-%config(noreplace) %{prefix}/adapter_conf.yaml
-/usr/local/sbin/simp_rpm_helper
-
-%files pe
 %defattr(-,root,root,-)
 %config(noreplace) %{prefix}/adapter_conf.yaml
 /usr/local/sbin/simp_rpm_helper
@@ -213,6 +192,7 @@ fi
   - Disable verification that '--target_dir' is a fully-qualified path.
 - Remove OBE %post logic plus the RPM requires and distribution
   release qualifier related to it.
+- Combine simp-adapter-foss and simp-adapter-pe into 1 package
 
 * Tue Apr 02 2019 Liz Nemsick <lnemsick.simp@gmail.com> -  1.0.0
 - Reworked simp_rpm_helper to install a module's content into a

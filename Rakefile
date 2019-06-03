@@ -25,3 +25,13 @@ Simp::Rake::Pkg.new(File.dirname(__FILE__))
 
 # Acceptance Tests
 Simp::Rake::Beaker.new(File.dirname(__FILE__))
+
+# make sure pkg:rpm is a prerequisite for beaker:suites and tell
+# user that is what is happening during the loooooong pause before
+# the test spins up
+task :log_pkg_rpm do
+  puts 'Custom test prep: Building simp-adapter RPM...'
+end
+
+Rake::Task['beaker:suites'].enhance [:log_pkg_rpm, 'pkg:rpm']
+
