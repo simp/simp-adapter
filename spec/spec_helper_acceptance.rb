@@ -36,8 +36,9 @@ end
 #   be installed as a repo on the host.  In this case set_up_simp_main
 #   and set_up_simp_deps are both ignored, as the repo file is assumed
 #   to be configured appropriately.
-# - Otherwise, BEAKER_repo is assumed to be the base name of the SIMP
-#   internet repos (e.g., '6_X_Alpha')
+# - Otherwise, BEAKER_repo should take the form
+# `<simprelease>[,<simpreleasetype>]`. For instance, if you want to use release
+# 6 from the unsable repos, you would pass `BEAKER_repo="6,unstable"`.
 #
 # +host+: Host object on which SIMP repo(s) will be installed
 # +set_up_simp_main+:  Whether to set up the main SIMP repo
@@ -46,7 +47,6 @@ end
 # @fails if the specified repos cannot be installed on host
 def set_up_simp_repos(host, set_up_simp_main = true, set_up_simp_deps = true )
   reponame = ENV['BEAKER_repo']
-  reponame ||= '6_X'
   if reponame[0] == '/'
     copy_repo(host, reponame)
   else
@@ -63,6 +63,12 @@ def set_up_simp_repos(host, set_up_simp_main = true, set_up_simp_deps = true )
     end
 
     install_simp_repos(host, disable_list)
+
+    if reponame
+      simp_release, simp_releasetype = reponame.split(',')
+      create_remote_file(host, '/etc/yum/vars/simprelease', simp_release)
+      create_remote_file(host, '/etc/yum/vars/simpreleasetype', simp_releasetype)
+    end
   end
 end
 
