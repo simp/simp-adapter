@@ -10,7 +10,7 @@ describe 'simp-adapter upgrade operations' do
   let(:new_adapter_config_file) { '/etc/simp/adapter_conf.yaml' }
 
   specify do
-    step '[prep] Configure yum for SIMP PackageCloud repos'
+    step '[prep] Configure yum for upstream SIMP repos'
     hosts.each { |host| set_up_simp_repos(host) }
     on(hosts, "yum clean all; yum makecache")
   end

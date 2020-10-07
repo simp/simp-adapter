@@ -11,7 +11,7 @@ describe 'simp-adapter hiera.yaml ops' do
   let(:global_hiera_simpbak) { '/etc/puppetlabs/puppet/hiera.yaml.simpbak' }
 
   specify do
-    step '[prep] Configure yum for SIMP PackageCloud repos'
+    step '[prep] Configure yum for upstream SIMP repos'
     hosts.each { |host| set_up_simp_repos(host) }
     on(hosts, "yum clean all; yum makecache")
   end
