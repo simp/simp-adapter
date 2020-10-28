@@ -15,9 +15,7 @@
 #   Travis CI Env Var      Type      Notes
 #   ---------------------  --------  -------------------------------------------
 #   GITHUB_OAUTH_TOKEN     Secure    Required for automated GitHub releases
-#   PUPPETFORGE_API_TOKEN  Secure    Required for automated Forge releases
 #   SKIP_GITHUB_PUBLISH    Optional  Skips publishing GitHub releases if "true"
-#   SKIP_FORGE_PUBLISH     Optional  Skips publishing to Puppet Forge if "true"
 #
 #   The secure env vars will be filtered in Travis CI log output, and aren't
 #   provided to untrusted builds (i.e, triggered by PR from another repository)
@@ -35,11 +33,11 @@
 #
 # Release Engineering notes:
 #
-#   To automagically publish a release to GitHub and PuppetForge:
+#   To automagically publish a release to GitHub:
 #
-#   - Set GITHUB_OAUTH_TOKEN and PUPPETFORGE_API_TOKEN as secure env variables
+#   - Set GITHUB_OAUTH_TOKEN as secure env variables
 #     in this repo's Travis CI settings
-#   - Push a git tag that matches the version in the module's `metadata.json`
+#   - Push a git tag that matches the component's version.
 #   - The tag SHOULD be annotated with release notes, but nothing enforces this
 #     convention at present
 #
@@ -66,10 +64,6 @@ before_install:
   - for x in ${HOME}/.rvm/gems/*; do gem uninstall -I -x -i "${x}" -v '>= 1.17' bundler || true; gem uninstall -I -x -i "${x}@global" -v '>= 1.17' bundler || true; done
   - gem install -v '~> 1.17' bundler
   - rm -f Gemfile.lock
-
-env:
-  global:
-    - 'FORGE_USER_AGENT="TravisCI-ForgeReleng-Script/0.3.3 (Purpose/forge-ops-for-${TRAVIS_REPO_SLUG})"'
 
 stages:
   - name: 'validate tokens'
@@ -118,19 +112,9 @@ jobs:
       script:
         - true
       before_deploy:
-        - "export PUPMOD_METADATA_VERSION=`ruby -r json -e \"puts JSON.parse(File.read('metadata.json')).fetch('version')\"`"
+        - "export SPECFILE_VERSION=`rpm -q --specfile build/*.spec --queryformat '%{VERSION}\n' | head -1`"
         - '[[ $TRAVIS_TAG =~ ^simp-${PUPMOD_METADATA_VERSION}$|^${PUPMOD_METADATA_VERSION}$ ]]'
-        - 'gem install -v "~> 5.5.0" puppet'
-        - 'git clean -f -x -d'
-        - 'puppet module build'
-        - 'find pkg -name ''*.tar.gz'''
       deploy:
-        - provider: script
-          skip_cleanup: true
-          script: 'curl -sS --fail -A "$FORGE_USER_AGENT" -H "Authorization: Bearer ${PUPPETFORGE_API_TOKEN}" -X POST -F "file=@$(find $PWD/pkg -name ''*.tar.gz'')" https://forgeapi.puppet.com/v3/releases'
-          on:
-            tags: true
-            condition: '($SKIP_FORGE_PUBLISH != true)'
         - provider: releases
           token: $GITHUB_OAUTH_TOKEN
           on:
