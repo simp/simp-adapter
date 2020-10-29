@@ -33,6 +33,7 @@ describe 'simp-adapter upgrade operations' do
       before :each do
          step '[prep] Revert to old version of simp-adapter'
          host.uninstall_package('simp-adapter')
+         host.uninstall_package('puppet-agent')
          host.install_package('simp-adapter-0.1.1')
       end
 
