@@ -1,5 +1,20 @@
+This directory contains test RPMs and the projects used to build them.
+
+* Some RPMs were explicitly built with old versions of simp-rake-helpers that
+  have bugs in how simp_rpm_helper is used during RPM operations.
+  (simp_rpm_helper called in %post instead of %posttrans.)
+* Some RPMs were explicitly built to test simp_rpm_helper features or bug fixes.
+* All projects include Gemfile.lock files to record the versions of gems used
+  when the RPMs were built.
+
+    ************************************************************
+    *** Do not modify these test files unless you understand ***
+    *** how the RPMs are being used in the tests!            ***
+    ************************************************************
+
 pupmod-simp-beakertest-0.0.1 - SIMP 6 RPM with simp_rpm_helper in %post
 pupmod-simp-beakertest-0.0.2 - SIMP 6 RPM with simp_rpm_helper in %posttrans
 pupmod-simp-beakertest-0.0.3 - SIMP 6 RPM with simp_rpm_helper in %posttrans and
-   a directory difference from pupmod-simp-beakertest-0.0.2
+                               a directory difference from
+                               pupmod-simp-beakertest-0.0.2
 pupmod-simp-site-2.0.5       - SIMP 6 RPM with simp_rpm_helper in %posttrans

@@ -6,7 +6,7 @@ test_name 'simp-adapter'
 #   - Has simp_rpm_helper in %post
 # - pupmod-simp-beakertest-0.0.3-0.noarch.rpm
 #   - Has simp_rpm_helper in %posttrans
-#   - Has an empty spec/fixutres/simp_rspec directory, which will not be checked
+#   - Has an empty spec/fixtures/simp_rspec directory, which will not be checked
 #     into git
 # - pupmod-simp-site-2.0.5-0.noarch.rpm
 #   - Has simp_rpm_helper in %posttrans
@@ -32,6 +32,7 @@ describe 'simp-adapter' do
       on(hosts, "mkdir -p #{local_yum_repo}")
       dist_dir = File.expand_path(File.join(File.dirname(__FILE__), '..','..', '..', '..', 'dist'))
       rpms = Dir.glob(File.join(dist_dir, '*noarch.rpm'))
+      puts "Local simp-adapter RPMs: #{rpms}"
       expect( rpms.size ).to eq 1
       hosts.each do |host|
         rpms.each{|rpm| scp_to(host, rpm, local_yum_repo) }
