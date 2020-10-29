@@ -10,7 +10,20 @@ describe 'simp-adapter upgrade operations' do
   let(:new_adapter_config_file) { '/etc/simp/adapter_conf.yaml' }
 
   specify do
-    step '[prep] Configure yum for SIMP PackageCloud repos'
+    step '[prep] Configure the legacy SIMP 6 repo'
+    legacy_repo = <<~REPO
+    [simp_legacy]
+    baseurl=https://download.simp-project.com/simp/yum/simp6/el/$releasever/$basearch
+    enabled=1
+    gpgcheck=0
+    sslverify=0
+    REPO
+
+    hosts.each do |host|
+      create_remote_file(host, '/etc/yum.repos.d/simp_legacy.repo', legacy_repo)
+    end
+
+    step '[prep] Configure yum for upstream SIMP repos'
     hosts.each { |host| set_up_simp_repos(host) }
     on(hosts, "yum clean all; yum makecache")
   end
