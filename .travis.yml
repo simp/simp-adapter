@@ -113,7 +113,8 @@ jobs:
         - true
       before_deploy:
         - "export SPECFILE_VERSION=`rpm -q --specfile build/*.spec --queryformat '%{VERSION}\n' | head -1`"
-        - '[[ $TRAVIS_TAG =~ ^simp-${PUPMOD_METADATA_VERSION}$|^${PUPMOD_METADATA_VERSION}$ ]]'
+        - '[[ $TRAVIS_TAG =~ ^${SPECFILE_VERSION}$ ]]'
+
       deploy:
         - provider: releases
           token: $GITHUB_OAUTH_TOKEN
