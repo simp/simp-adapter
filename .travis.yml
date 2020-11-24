@@ -68,44 +68,51 @@ before_install:
 stages:
   - name: 'validate tokens'
     if: 'env(VALIDATE_TOKENS) = yes'
-  - name: check
-    if: 'NOT env(VALIDATE_TOKENS) = yes'
-  - name: spec
-    if: 'NOT env(VALIDATE_TOKENS) = yes'
+###  - name: check
+###    if: 'NOT env(VALIDATE_TOKENS) = yes'
+###  - name: spec
+###    if: 'NOT env(VALIDATE_TOKENS) = yes'
   - name: deploy
     if: 'tag IS present AND NOT env(VALIDATE_TOKENS) = yes'
 
 jobs:
   include:
-    - stage: check
-      name: 'Syntax, style, and validation checks'
-      rvm: 2.4.9
-      env: PUPPET_VERSION="~> 5"
-      script:
-        - bundle exec rake pkg:compare_latest_tag
-        - bundle exec rake pkg:create_tag_changelog
-
-    - stage: spec
-      rvm: 2.4.9
-      name: 'Puppet 5.5 (SIMP 6.4, PE 2018.1)'
-      env: PUPPET_VERSION="~> 5.5.0"
-      script:
-        - bundle exec rake spec
-
-    - stage: spec
-      name: 'Puppet 5.x (Latest)'
-      rvm: 2.4.9
-      env: PUPPET_VERSION="~> 5.0"
-      script:
-        - bundle exec rake spec
-
-    - stage: spec
-      name: 'Puppet 6.10 (PE 2019.2)'
-      rvm: 2.5.7
-      env: PUPPET_VERSION="~> 6.10.0"
-      script:
-        - bundle exec rake spec
-
+    ###  Testing on Travis CI is indefinitely disabled
+    ###
+    ###  See:
+    ###    * https://blog.travis-ci.com/2020-11-02-travis-ci-new-billing
+    ###    * https://simp-project.atlassian.net/browse/SIMP-8703
+    ###
+    ###    - stage: check
+    ###      name: 'Syntax, style, and validation checks'
+    ###      rvm: 2.4.9
+    ###      env: PUPPET_VERSION="~> 5"
+    ###      script:
+    ###        - bundle exec rake pkg:compare_latest_tag
+    ###        - bundle exec rake pkg:create_tag_changelog
+    ###        - stage: spec
+    ###
+    ###    - stage: spec
+    ###      rvm: 2.4.9
+    ###      name: 'Puppet 5.5 (SIMP 6.4, PE 2018.1)'
+    ###      env: PUPPET_VERSION="~> 5.5.0"
+    ###      script:
+    ###        - bundle exec rake spec
+    ###
+    ###    - stage: spec
+    ###      name: 'Puppet 5.x (Latest)'
+    ###      rvm: 2.4.9
+    ###      env: PUPPET_VERSION="~> 5.0"
+    ###      script:
+    ###        - bundle exec rake spec
+    ###
+    ###    - stage: spec
+    ###      name: 'Puppet 6.10 (PE 2019.2)'
+    ###      rvm: 2.5.7
+    ###      env: PUPPET_VERSION="~> 6.10.0"
+    ###      script:
+    ###        - bundle exec rake spec
+    ###
     - stage: deploy
       rvm: 2.4.9
       env: PUPPET_VERSION="~> 5.5.0"
