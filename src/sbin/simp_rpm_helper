@@ -157,9 +157,14 @@ class SimpRpmHelper
 
   def initialize
     # simp-adapter RPM requires 'git' and 'rsync' to ensure these commands
-    # are available
+    # are availables in el < 8, but, due to nuances with dnf, only recommends
+    # 'git' and 'rsync' otherwise. So, we have to verify the commands are
+    # available.
     @git = Facter::Core::Execution.which('git')
+    fail("#{PROGRAM_NAME} cannot locate 'git' executable") if @git.nil?
+
     @rsync = Facter::Core::Execution.which('rsync')
+    fail("#{PROGRAM_NAME} cannot locate 'rsync' executable") if @rsync.nil?
 
     # A list of modules(<author>-<name>) that should never be imported
     # into the SIMP-managed bare repos and the reason each should be skipped.
