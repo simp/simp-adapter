@@ -282,6 +282,13 @@ pup6.18.0-unit:
 # Acceptance Tests
 # ==============================================================================
 # simp-adapter RPM requires Puppet 5+
+#
+# Commented out all FIPS tests for simp-adapter beginning in version 2.1.0.
+# * For unknown reasons, the default suite takes an inordinate amount of time
+#   in to run in CentOS 8.3.
+#   - Each RPM install takes ~150 seconds.
+#   - The ruby compile takes a very long time.
+# * FIPS mode operation of simp-adapter is tested in simp-packer.
 
 pup5.5.20-el7:
   <<: *acceptance_base
@@ -289,26 +296,11 @@ pup5.5.20-el7:
   script:
     - 'bundle exec rake beaker:suites[default,el7]'
 
-pup5.5.20-el7-fips:
-  <<: *acceptance_base
-  <<: *pup_5_5_20
-  <<: *with_SIMP_ACCEPTANCE_MATRIX_LEVEL_3
-  script:
-    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,el7]'
-
 pup5.5.20-el8:
   <<: *acceptance_base
   <<: *pup_5_5_20
   script:
     - 'bundle exec rake beaker:suites[default,el8]'
-
-pup5.5.20-el8-fips:
-  <<: *acceptance_base
-  <<: *pup_5_5_20
-  <<: *with_SIMP_ACCEPTANCE_MATRIX_LEVEL_3
-  script:
-    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,el8]'
-
 
 pup5.5.20-oel7:
   <<: *acceptance_base
@@ -317,13 +309,6 @@ pup5.5.20-oel7:
   script:
     - 'bundle exec rake beaker:suites[default,oel7]'
 
-pup5.5.20-oel7-fips:
-  <<: *acceptance_base
-  <<: *pup_5_5_20
-  <<: *with_SIMP_ACCEPTANCE_MATRIX_LEVEL_3
-  script:
-    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,oel7]'
-
 pup5.5.20-oel8:
   <<: *acceptance_base
   <<: *pup_5_5_20
@@ -331,25 +316,18 @@ pup5.5.20-oel8:
   script:
     - 'bundle exec rake beaker:suites[default,oel8]'
 
-pup5.5.20-oel8-fips:
-  <<: *acceptance_base
-  <<: *pup_5_5_20
-  <<: *with_SIMP_ACCEPTANCE_MATRIX_LEVEL_3
-  script:
-    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,oel8]'
-
 pup6-el7:
   <<: *acceptance_base
   <<: *pup_6
   script:
     - 'bundle exec rake beaker:suites[default,el7]'
 
-pup6-el7-fips:
-  <<: *acceptance_base
-  <<: *pup_6
-  <<: *with_SIMP_ACCEPTANCE_MATRIX_LEVEL_3
-  script:
-    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,el7]'
+#pup6-el7-fips:
+#  <<: *acceptance_base
+#  <<: *pup_6
+#  <<: *with_SIMP_ACCEPTANCE_MATRIX_LEVEL_3
+#  script:
+#    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,el7]'
 
 pup6-el8:
   <<: *acceptance_base
@@ -357,12 +335,12 @@ pup6-el8:
   script:
     - 'bundle exec rake beaker:suites[default,el8]'
 
-pup6-el8-fips:
-  <<: *acceptance_base
-  <<: *pup_6
-  <<: *with_SIMP_ACCEPTANCE_MATRIX_LEVEL_3
-  script:
-    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,el8]'
+#pup6-el8-fips:
+#  <<: *acceptance_base
+#  <<: *pup_6
+#  <<: *with_SIMP_ACCEPTANCE_MATRIX_LEVEL_3
+#  script:
+#    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,el8]'
 
 pup6.18.0-el7:
   <<: *acceptance_base
@@ -370,11 +348,11 @@ pup6.18.0-el7:
   script:
     - 'bundle exec rake beaker:suites[default,el7]'
 
-pup6.18.0-el7-fips:
-  <<: *acceptance_base
-  <<: *pup_6_18_0
-  script:
-    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,el7]'
+#pup6.18.0-el7-fips:
+#  <<: *acceptance_base
+#  <<: *pup_6_18_0
+#  script:
+#    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,el7]'
 
 pup6.18.0-el8:
   <<: *acceptance_base
@@ -382,11 +360,11 @@ pup6.18.0-el8:
   script:
     - 'bundle exec rake beaker:suites[default,el8]'
 
-pup6.18.0-el8-fips:
-  <<: *acceptance_base
-  <<: *pup_6_18_0
-  script:
-    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,el8]'
+#pup6.18.0-el8-fips:
+#  <<: *acceptance_base
+#  <<: *pup_6_18_0
+#  script:
+#    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,el8]'
 
 pup6.18.0-oel7:
   <<: *acceptance_base
@@ -394,12 +372,12 @@ pup6.18.0-oel7:
   script:
     - 'bundle exec rake beaker:suites[default,oel7]'
 
-pup6.18.0-oel7-fips:
-  <<: *acceptance_base
-  <<: *pup_6_18_0
-  <<: *with_SIMP_ACCEPTANCE_MATRIX_LEVEL_3
-  script:
-    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,oel7]'
+#pup6.18.0-oel7-fips:
+#  <<: *acceptance_base
+#  <<: *pup_6_18_0
+#  <<: *with_SIMP_ACCEPTANCE_MATRIX_LEVEL_3
+#  script:
+#    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,oel7]'
 
 pup6.18.0-oel8:
   <<: *acceptance_base
@@ -407,10 +385,9 @@ pup6.18.0-oel8:
   script:
     - 'bundle exec rake beaker:suites[default,oel8]'
 
-pup6.18.0-oel8-fips:
-  <<: *acceptance_base
-  <<: *pup_6_18_0
-  <<: *with_SIMP_ACCEPTANCE_MATRIX_LEVEL_3
-  script:
-    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,oel8]'
-
+#pup6.18.0-oel8-fips:
+#  <<: *acceptance_base
+#  <<: *pup_6_18_0
+#  <<: *with_SIMP_ACCEPTANCE_MATRIX_LEVEL_3
+#  script:
+#    - 'BEAKER_fips=yes bundle exec rake beaker:suites[default,oel8]'
