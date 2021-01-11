@@ -251,6 +251,21 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
       end
     end
 
+    context 'missing required commands' do
+      it 'should fail when git is command missing' do
+        allow(Facter::Core::Execution).to receive(:which).with('git').and_return(nil)
+        expect { SimpRpmHelper.new }.to raise_error(RuntimeError,
+          /cannot locate 'git' executable/)
+      end
+
+      it 'should fail when rsync is command missing' do
+        allow(Facter::Core::Execution).to receive(:which).with(any_args).and_call_original
+        allow(Facter::Core::Execution).to receive(:which).with('rsync').and_return(nil)
+        expect { SimpRpmHelper.new }.to raise_error(RuntimeError,
+          /cannot locate 'rsync' executable/)
+      end
+    end
+
     context 'other failures' do
       let(:git_cmd) {  Facter::Core::Execution.which('git') }
 

@@ -1,7 +1,7 @@
 Summary: SIMP Adapter
 Name: simp-adapter
-Version: 2.0.0
-Release: 0
+Version: 2.1.0
+Release: 1%{?dist}
 License: Apache-2.0
 Group: Applications/System
 Source: %{name}-%{version}-%{release}.tar.gz
@@ -10,15 +10,24 @@ Buildarch: noarch
 
 Prefix: %{_sysconfdir}/simp
 
-# simp_rpm_helper uses git and rsync
+# simp_rpm_helper uses git and rsync.
+%if 0%{?rhel} > 7
+# On el > 7, dnf will, by default, also remove the packages for these
+# executables when the simp-adapter is uninstalled, if they are not required
+# by any other packages.  So, use weak dependencies known to the package
+# manager. See rpm.org/user_doc/dependencies.html.
+Recommends: git
+Recommends: rsync
+%else
 Requires: git
 Requires: rsync
+%endif
 
 # %postun uses /opt/puppetlabs/puppet/bin/ruby
 Requires(postun): puppet-agent
 
 # simp_rpm_helper uses /opt/puppetlabs/puppet/bin/ruby, a more current
-# and thus more capable Ruby than is provided by the OS (esp. on el6)
+# and thus more capable Ruby than is provided by the OS
 Requires: puppet-agent >= 5.5.7
 
 Provides: simp-adapter = %{version}
@@ -89,6 +98,15 @@ if [ -f "/etc/simp/adapter_config.yaml.rpmsave" ]; then
 fi
 
 %changelog
+* Tue Jan 01 2021 Liz Nemsick <lnemsick.simp@gmail.com> -  2.1.0
+- Added support for EL8
+  - Use 'Recommends' in lieu of 'Requires' on EL8 so that the git
+    package is not uninstalled if the simp-adapter package
+    is uninstalled.
+  - simp_rpm_helper now checks for the 'git' or 'rsync' executables
+    and fails if either cannot be found. This is necessary because
+    'Recommends' does not ensure 'git' and 'rsync' are available.
+
 * Tue Oct 27 2020 Liz Nemsick <lnemsick.simp@gmail.com> -  2.0.0
 - Removed logic to ensure any existing, global hiera.yaml.simp file is not
   removed on upgrade from simp-adapter <= 0.0.6.

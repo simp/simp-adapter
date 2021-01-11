@@ -1,5 +1,7 @@
 require 'spec_helper_acceptance'
 
+TEST_RVM_VERSION = (ENV.key?('TEST_RVM_VERSION') ? ENV['TEST_RVM_VERSION'] : '2.5.8')
+
 test_name 'simp-adapter'
 # This test uses 3 of the 4 test module RPMs:
 # - pupmod-simp-beakertest-0.0.1-0.noarch.rpm
@@ -17,28 +19,47 @@ describe 'simp-adapter' do
   context 'Initial test prep on each host' do
     specify do
       step '[prep] Install OS packages'
+
       yum_packages = ['createrepo','yum-utils']
       cmd = yum_packages.map{|pkg| "puppet resource package #{pkg} ensure=installed" }.join(' && ')
       on(hosts,cmd)
 
-      result = on(hosts[0], 'cat /etc/oracle-release', :accept_all_exit_codes => true)
-      if result.exit_code == 0
-        # problem with OEL repos...need optional repos enabled in order
-        # for all the rvm build dependencies to resolve
-        on(hosts, 'yum-config-manager --enable ol7_optional_latest')
+      # adjust repos based on OS
+      hosts.each do |host|
+        os_info = fact_on(host, 'os')
+        os_maj_rel = os_info['release']['major']
+        case os_info['name']
+        when 'CentOS'
+          if os_maj_rel == '8'
+            on(host, 'dnf config-manager --set-enabled powertools')
+          end
+        when 'OracleLinux'
+          case os_maj_rel
+          when '7'
+            on(hosts, 'yum-config-manager --enable ol7_optional_latest')
+          when '8'
+            # for libyaml-devel and openssl-devel
+            on(hosts, 'dnf config-manager --set-enabled ol8_codeready_builder')
+          end
+        end
       end
 
-      step '[prep] Copy pre-built simp-adapter RPMs to hosts'
-      on(hosts, "mkdir -p #{local_yum_repo}")
-      dist_dir = File.expand_path(File.join(File.dirname(__FILE__), '..','..', '..', '..', 'dist'))
-      rpms = Dir.glob(File.join(dist_dir, '*noarch.rpm'))
-      puts "Local simp-adapter RPMs: #{rpms}"
-      expect( rpms.size ).to eq 1
-      hosts.each do |host|
-        rpms.each{|rpm| scp_to(host, rpm, local_yum_repo) }
-      end
+      rpm_build_packages = [ 'openssl', 'git', 'rpm-build', 'gnupg2', 'libicu-devel',
+        'libxml2', 'libxml2-devel', 'libxslt', 'libxslt-devel', 'rpmdevtools',
+        'ruby-devel',
+      ]
+      cmd = rpm_build_packages.map{|pkg| "puppet resource package #{pkg} ensure=installed" }.join(' && ')
+      on(hosts,cmd)
+
+
+      gem_build_packages = ['libyaml-devel', 'glibc-headers', 'autoconf', 'gcc',
+        'gcc-c++', 'glibc-devel', 'readline-devel', 'libffi-devel',
+        'automake', 'libtool', 'bison', 'sqlite-devel' ]
+      cmd = gem_build_packages.map{|pkg| "puppet resource package #{pkg} ensure=installed" }.join(' && ')
+      on(hosts,cmd)
 
       step '[prep] Copy pre-built test RPMs to hosts'
+      on(hosts, "mkdir -p #{local_yum_repo}")
       test_rpm_src = File.join(fixtures_path,'test_module_rpms')
       rpms = Dir.glob(File.join(test_rpm_src,'*.rpm'))
       hosts.each do |host|
@@ -47,25 +68,71 @@ describe 'simp-adapter' do
     end
 
     specify do
-      step '[prep] Create git_user for other tests'
-      on(hosts,'useradd -b /home -m -c "Build User" -s /bin/bash -U git_user')
+      step '[prep] Create build_user that has a simp-adapter project directory'
+      # Allow the build user to perform privileged operations, so if the package
+      # list is incomplete during rvm install, it will install packages via sudo
+      # and fix the problem automatically
+      on(hosts,"echo 'Defaults:build_user !requiretty' >> /etc/sudoers")
+      on(hosts,"echo 'build_user ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers")
+      on(hosts,'useradd -b /home -m -c "Build User" -s /bin/bash -U build_user')
+
+      # Move simp-adapter files that were deployed as if they were a puppet module
+      # (via .fixtures.yaml) to build_user's home dir
+      on(hosts,'mv /etc/puppetlabs/code/environments/production/modules/simp-adapter /home/build_user')
+      on(hosts,'chown -R build_user:build_user /home/build_user/simp-adapter')
+
+      step '[prep] Install rvm for build_user'
+      # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+      # RVM INSTALL STEPS INITIALLY LIFTED FROM simp-core DOCKER FILES USED FOR ISO BUILDING
+      # Modifications made:
+      # - Remove 'gpg2 --refresh-keys':
+      #   - Not necessary.
+      #   - Fails on EL8/OEL8 when hpks is used for keyserver.
+      #   - hkps failure is not a firewalld issue, as firewalld is not running.
+      # - Do not compile ruby with dtrace: Fails on OEL8 8.3.
+      # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+      on(hosts, %(runuser build_user -l -c "for i in {1..5}; do { gpg2 --keyserver  hkp://pool.sks-keyservers.net --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3 || gpg2 --keyserver hkp://pgp.mit.edu --recv-key 409B6B1796C275462A1703113804BB82D39DC0E3 || gpg2 --keyserver hkp://keys.gnupg.net --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3; } && break || sleep 1; done"))
+      on(hosts, %(runuser build_user -l -c "for i in {1..5}; do { gpg2 --keyserver  hkp://pool.sks-keyservers.net --recv-keys 7D2BAF1CF37B13E2069D6956105BD0E739499BDB || gpg2 --keyserver hkp://pgp.mit.edu --recv-keys 7D2BAF1CF37B13E2069D6956105BD0E739499BDB || gpg2 --keyserver hkp://keys.gnupg.net --recv-keys 7D2BAF1CF37B13E2069D6956105BD0E739499BDB; } && break || sleep 1; done"))
+
+      on(hosts,'runuser build_user -l -c "curl -sSL https://raw.githubusercontent.com/rvm/rvm/stable/binscripts/rvm-installer -o rvm-installer && curl -sSL https://raw.githubusercontent.com/rvm/rvm/stable/binscripts/rvm-installer.asc -o rvm-installer.asc && gpg2 --verify rvm-installer.asc rvm-installer && bash rvm-installer"')
+
+      # As of Oracle Linux Server release 8.3, have to disable dtrace on oel8 to get
+      # ruby to build. Since don't need it, disable everywhere.
+      on(hosts,"runuser build_user -l -c \"rvm install #{TEST_RVM_VERSION} --disable-binary --enable-dtrace=no\"")
+      on(hosts,"runuser build_user -l -c \"rvm use --default #{TEST_RVM_VERSION}\"")
+      on(hosts,'runuser build_user -l -c "rvm all do gem install bundler --no-document"')
+
+      step '[prep] Build simp-adapter RPM'
+      on(hosts,'runuser build_user -l -c "cd simp-adapter; git init"') # git project required for pkg:rpm
+      on(hosts,'runuser build_user -l -c "cd simp-adapter; bundle update; bundle exec rake clean"')
+      on(hosts,'runuser build_user -l -c "cd simp-adapter; bundle exec rake pkg:rpm"')
     end
 
     specify do
       step '[prep] Create a local yum repo'
-      local_yum_repo_conf = <<-EOM
-[local_yum]
-name=Local Repos
-baseurl=file://#{local_yum_repo}
-enabled=1
-gpgcheck=0
-repo_gpgcheck=0
-    EOM
+      local_yum_repo_conf = <<~EOM
+        [local_yum]
+        name=Local Repos
+        baseurl=file://#{local_yum_repo}
+        enabled=1
+        gpgcheck=0
+        repo_gpgcheck=0
+      EOM
+
+      rpm_src = '/home/build_user/simp-adapter/dist'
+      hosts.each do |host|
+        on(host, "cp #{rpm_src}/simp-adapter-[0-9]*rpm #{local_yum_repo}")
+      end
 
       on(hosts, "cd #{local_yum_repo} && createrepo .")
       create_remote_file(hosts, '/etc/yum.repos.d/beaker_local.repo', local_yum_repo_conf)
     end
   end
+
+    specify do
+      step '[prep] Create git_user for other tests'
+      on(hosts,'useradd -b /home -m -c "Git User" -s /bin/bash -U git_user')
+    end
 
   hosts.each do |host|
     context "on host #{host}" do

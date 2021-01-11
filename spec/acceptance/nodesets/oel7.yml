@@ -6,12 +6,12 @@
   end
 -%>
 HOSTS:
-  el8:
+  el7:
     roles:
       - server
       - default
-    platform:   el-8-x86_64
-    box: centos/8
+    platform:   el-7-x86_64
+    box: generic/oracle7
     hypervisor: <%= hypervisor %>
 
 CONFIG:
