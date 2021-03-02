@@ -80,6 +80,7 @@ describe 'simp-adapter' do
       # (via .fixtures.yaml) to build_user's home dir
       on(hosts,'mv /etc/puppetlabs/code/environments/production/modules/simp-adapter /home/build_user')
       on(hosts,'chown -R build_user:build_user /home/build_user/simp-adapter')
+      on(hosts,'rm -rf /home/build_user/simp-adapter/Gemfile.lock')
 
       step '[prep] Install rvm for build_user'
       # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
