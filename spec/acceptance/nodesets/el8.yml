@@ -8,10 +8,10 @@
 HOSTS:
   el8:
     roles:
-      - server
       - default
+      - server
     platform:   el-8-x86_64
-    box: centos/8
+    box: generic/centos8
     hypervisor: <%= hypervisor %>
 
 CONFIG:

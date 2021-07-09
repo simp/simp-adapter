@@ -28,7 +28,7 @@ Requires(postun): puppet-agent
 
 # simp_rpm_helper uses /opt/puppetlabs/puppet/bin/ruby, a more current
 # and thus more capable Ruby than is provided by the OS
-Requires: puppet-agent >= 5.5.7
+Requires: puppet-agent >= 6.22.1
 
 Provides: simp-adapter = %{version}
 Provides: simp-adapter-foss = %{version}
@@ -98,7 +98,7 @@ if [ -f "/etc/simp/adapter_config.yaml.rpmsave" ]; then
 fi
 
 %changelog
-* Tue Jan 01 2021 Liz Nemsick <lnemsick.simp@gmail.com> -  2.1.0
+* Fri Jul 09 2021 Liz Nemsick <lnemsick.simp@gmail.com> -  2.1.0
 - Added support for EL8
   - Use 'Recommends' in lieu of 'Requires' on EL8 so that the git
     package is not uninstalled if the simp-adapter package
@@ -106,6 +106,7 @@ fi
   - simp_rpm_helper now checks for the 'git' or 'rsync' executables
     and fails if either cannot be found. This is necessary because
     'Recommends' does not ensure 'git' and 'rsync' are available.
+- Updated minimum version of puppet-agent required to 6.22.1
 
 * Tue Oct 27 2020 Liz Nemsick <lnemsick.simp@gmail.com> -  2.0.0
 - Removed logic to ensure any existing, global hiera.yaml.simp file is not

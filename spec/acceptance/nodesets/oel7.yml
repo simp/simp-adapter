@@ -8,8 +8,8 @@
 HOSTS:
   el7:
     roles:
-      - server
       - default
+      - server
     platform:   el-7-x86_64
     box: generic/oracle7
     hypervisor: <%= hypervisor %>
