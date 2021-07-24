@@ -1,6 +1,12 @@
 # Validate API tokens in GitHub Secrets against their respective services
 # ------------------------------------------------------------------------------
 #
+#             NOTICE: **This file is maintained with puppetsync**
+#
+# This file is updated automatically as part of a puppet module baseline.
+#
+# The next baseline sync will overwrite any local changes to this file!
+#
 # ==============================================================================
 #
 # This pipeline uses the following GitHub Action Secrets:
@@ -22,7 +28,7 @@ on:
 jobs:
   gitlab:
     name: 'GitLab token has scope for developer'
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-18.04
     env:
       GITLAB_API_PRIVATE_TOKEN: ${{ secrets.GITLAB_API_PRIVATE_TOKEN }}
       GITLAB_API_URL: ${{ secrets.GITLAB_API_URL }}
@@ -37,7 +43,7 @@ jobs:
 
   github-no-scope:
     name: 'No-scope GitHub token has NO scopes'
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-18.04
     env:
       GITHUB_ORG: ${{ github.event.organization.login }}
       NO_SCOPE_GITHUB_TOKEN: ${{secrets.NO_SCOPE_GITHUB_TOKEN}}
