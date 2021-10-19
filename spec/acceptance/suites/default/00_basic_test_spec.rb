@@ -92,7 +92,7 @@ describe 'simp-adapter' do
       #   - hkps failure is not a firewalld issue, as firewalld is not running.
       # - Do not compile ruby with dtrace: Fails on OEL8 8.3.
       # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-      on(host, %(#{run_cmd} "for i in {1..5}; do { gpg2 --keyserver  hkps://keys.openpgp.org --recv-keys 7D2BAF1CF37B13E2069D6956105BD0E739499BDB || gpg2 --keyserver hkps://keyserver.ubuntu.com --recv-keys 7D2BAF1CF37B13E2069D6956105BD0E739499BDB; } && break || sleep 1; done"))
+      on(hosts, %(runuser build_user -l -c "for i in {1..5}; do { gpg2 --keyserver  hkps://keys.openpgp.org --recv-keys 7D2BAF1CF37B13E2069D6956105BD0E739499BDB || gpg2 --keyserver hkps://keyserver.ubuntu.com --recv-keys 7D2BAF1CF37B13E2069D6956105BD0E739499BDB; } && break || sleep 1; done"))
 
       on(hosts,'runuser build_user -l -c "curl -sSL https://raw.githubusercontent.com/rvm/rvm/stable/binscripts/rvm-installer -o rvm-installer && curl -sSL https://raw.githubusercontent.com/rvm/rvm/stable/binscripts/rvm-installer.asc -o rvm-installer.asc && gpg2 --verify rvm-installer.asc rvm-installer && bash rvm-installer"')
 
