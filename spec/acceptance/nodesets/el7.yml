@@ -1,9 +1,9 @@
 ---
 HOSTS:
-  el7:
+  centos-7-x64:
     roles:
-    - default
-    - server
+      - default
+      - server
     platform: el-7-x86_64
     box: centos/7
     hypervisor: "<%= ENV.fetch('BEAKER_HYPERVISOR', 'vagrant') %>"
@@ -12,6 +12,5 @@ HOSTS:
 CONFIG:
   log_level: verbose
   type: aio
-  vagrant_memsize: 256
   synced_folder: disabled
   puppet_collection: "<%= ENV.fetch('BEAKER_PUPPET_COLLECTION', 'puppet7') %>"
