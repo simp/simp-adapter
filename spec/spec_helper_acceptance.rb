@@ -17,7 +17,7 @@ include Acceptance::Helpers::GitUtils
 #
 # @fails if the specified repo file cannot be installed on host
 def copy_repo(host, repo_filename, repo_name = 'simp_manual.repo')
-  if File.exists?(repo_filename)
+  if File.exist?(repo_filename)
     puts('='*72)
     puts("Using repos defined in #{repo_filename}")
     puts('='*72)
