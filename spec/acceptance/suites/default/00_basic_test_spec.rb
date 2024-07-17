@@ -1,6 +1,7 @@
 require 'spec_helper_acceptance'
 
-TEST_RVM_VERSION = (ENV.key?('TEST_RVM_VERSION') ? ENV['TEST_RVM_VERSION'] : '2.5.8')
+TEST_RVM_VERSION = ENV.fetch('TEST_RVM_VERSION', '2.7.8')
+BUNDLER_VERSION = ENV.fetch('BUNDLER_VERSION', '2.4.22')
 
 test_name 'simp-adapter'
 # This test uses 3 of the 4 test module RPMs:
@@ -100,7 +101,7 @@ describe 'simp-adapter' do
       # ruby to build. Since don't need it, disable everywhere.
       on(hosts,"runuser build_user -l -c \"rvm install #{TEST_RVM_VERSION} --disable-binary --enable-dtrace=no\"")
       on(hosts,"runuser build_user -l -c \"rvm use --default #{TEST_RVM_VERSION}\"")
-      on(hosts,'runuser build_user -l -c "rvm all do gem install bundler --no-document"')
+      on(hosts,"runuser build_user -l -c \"rvm all do gem install bundler -v #{BUNDLER_VERSION} --no-document\"")
 
       step '[prep] Build simp-adapter RPM'
       on(hosts,'runuser build_user -l -c "cd simp-adapter; git init"') # git project required for pkg:rpm

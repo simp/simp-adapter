@@ -1,6 +1,6 @@
 Summary: SIMP Adapter
 Name: simp-adapter
-Version: 2.1.1
+Version: 2.2.0
 Release: 1%{?dist}
 License: Apache-2.0
 Group: Applications/System
@@ -18,11 +18,11 @@ Prefix: %{_sysconfdir}/simp
 # manager. See rpm.org/user_doc/dependencies.html.
 Recommends: git
 Recommends: rsync
-Recommends: puppet-agent >= 6.22.1
+Recommends: puppet-agent >= 7.20.0
 %else
 Requires: git
 Requires: rsync
-Requires: puppet-agent >= 6.22.1
+Requires: puppet-agent >= 7.20.0
 %endif
 
 # %postun uses /opt/puppetlabs/puppet/bin/ruby
@@ -96,6 +96,12 @@ if [ -f "/etc/simp/adapter_config.yaml.rpmsave" ]; then
 fi
 
 %changelog
+* Tue Jul 16 2024 Steven Pritchard <steve@sicura.us> - 2.2.0
+- Updates for Puppet 8
+  - Fixes for Ruby 3
+  - Fix use of legacy facts
+  - Updated minimum required version of puppet-agent to 7.20.0
+
 * Tue Oct 05 2021 Trevor Vaughan <tvaughan@onyxpoint.com> - 2.1.1
 - Fix the EL8 dependencies
 

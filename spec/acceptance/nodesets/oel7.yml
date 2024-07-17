@@ -1,21 +1,15 @@
-<%
-  if ENV['BEAKER_HYPERVISOR']
-    hypervisor = ENV['BEAKER_HYPERVISOR']
-  else
-    hypervisor = 'vagrant'
-  end
--%>
+---
 HOSTS:
-  el7:
+  oel-7-x64:
     roles:
       - default
       - server
-    platform:   el-7-x86_64
+    platform: el-7-x86_64
     box: generic/oracle7
-    hypervisor: <%= hypervisor %>
+    hypervisor: "<%= ENV.fetch('BEAKER_HYPERVISOR', 'vagrant') %>"
 
 CONFIG:
   log_level: verbose
   type: aio
-  vagrant_memsize: 256
   synced_folder: disabled
+  puppet_collection: "<%= ENV.fetch('BEAKER_PUPPET_COLLECTION', 'puppet7') %>"
