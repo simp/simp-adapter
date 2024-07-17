@@ -30,7 +30,7 @@ jobs:
       - name: "Install Ruby ${{matrix.puppet.ruby_version}}"
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 2.5
+          ruby-version: 3.2
           bundler-cache: true
       - run: |
           bundle show
@@ -43,7 +43,7 @@ jobs:
       - name: 'Install Ruby ${{matrix.puppet.ruby_version}}'
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 2.5
+          ruby-version: 3.2
           bundler-cache: true
       - run: 'command -v rpm || if command -v apt-get; then sudo apt-get update; sudo apt-get install -y rpm; fi ||:'
       - name: 'Tags and changelogs'
@@ -61,6 +61,9 @@ jobs:
           - label: 'Puppet 7.x'
             puppet_version: '~> 7.0'
             ruby_version: '2.7'
+          - label: 'Puppet 8.x'
+            puppet_version: '~> 8.0'
+            ruby_version: '3.2'
     env:
       PUPPET_VERSION: '${{matrix.puppet.puppet_version}}'
     steps:
