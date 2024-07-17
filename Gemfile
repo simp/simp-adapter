@@ -20,6 +20,13 @@ group :development do
   gem 'pry-doc'
 end
 
+group :syntax do
+  gem 'rubocop', '~> 1.65', require: false
+  gem 'rubocop-rspec', '~> 3.0', require: false
+  gem 'rubocop-performance', '~> 1.21', require: false
+  gem 'rubocop-rake', '~> 0.6', require: false
+end
+
 group :system_tests do
   gem 'bcrypt_pbkdf'
   gem 'beaker'

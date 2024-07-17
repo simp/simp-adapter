@@ -21,8 +21,7 @@ on:
 
 jobs:
   ruby-style:
-    if: false # TODO Modules will need: rubocop in Gemfile, .rubocop.yml
-    name: 'Ruby Style (experimental)'
+    name: 'Ruby Style'
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -32,9 +31,10 @@ jobs:
         with:
           ruby-version: 3.2
           bundler-cache: true
-      - run: |
+      - name: 'Run rubocop'
+        run: |
           bundle show
-          bundle exec rake rubocop
+          bundle exec rubocop
   releng-checks:
     name: 'RELENG checks'
     runs-on: ubuntu-latest

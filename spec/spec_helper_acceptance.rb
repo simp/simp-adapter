@@ -7,7 +7,6 @@ require_relative 'acceptance/helpers/gitutils'
 include Simp::BeakerHelpers
 include Acceptance::Helpers::GitUtils
 
-
 # Repository helper methods stolen from simp-core/spec/acceptance/helpers/repo_helper.rb
 
 # Install a yum repo
@@ -16,15 +15,12 @@ include Acceptance::Helpers::GitUtils
 # +repo_filename+: Path of the repo file to be installed
 #
 # @fails if the specified repo file cannot be installed on host
-def copy_repo(host, repo_filename, repo_name = 'simp_manual.repo')
-  if File.exist?(repo_filename)
-    puts('='*72)
-    puts("Using repos defined in #{repo_filename}")
-    puts('='*72)
-    scp_to(hosts, repo_filename, "/etc/yum.repos.d/#{repo_name}")
-  else
-    fail("File #{repo_filename} could not be found")
-  end
+def copy_repo(_host, repo_filename, repo_name = 'simp_manual.repo')
+  raise("File #{repo_filename} could not be found") unless File.exist?(repo_filename)
+  puts('=' * 72)
+  puts("Using repos defined in #{repo_filename}")
+  puts('=' * 72)
+  scp_to(hosts, repo_filename, "/etc/yum.repos.d/#{repo_name}")
 end
 
 # Set up SIMP repos on the host
@@ -45,7 +41,7 @@ end
 # +set_up_simp_deps+:  Whether to set up the SIMP dependencies repo
 #
 # @fails if the specified repos cannot be installed on host
-def set_up_simp_repos(host, set_up_simp_main = true, set_up_simp_deps = true )
+def set_up_simp_repos(host, set_up_simp_main = true, set_up_simp_deps = true)
   reponame = ENV['BEAKER_repo']
   if reponame && reponame[0] == '/'
     copy_repo(host, reponame)
@@ -83,7 +79,6 @@ unless ENV['BEAKER_provision'] == 'no'
   end
 end
 
-
 RSpec.configure do |c|
   # ensure that environment OS is ready on each host
   fix_errata_on hosts
@@ -97,25 +92,21 @@ RSpec.configure do |c|
 
   # Configure all nodes in nodeset
   c.before :suite do
-    begin
-      # Install modules and dependencies from spec/fixtures/modules
-      copy_fixture_modules_to( hosts )
-      server = only_host_with_role(hosts, 'server')
+    # Install modules and dependencies from spec/fixtures/modules
+    copy_fixture_modules_to(hosts)
+    server = only_host_with_role(hosts, 'server')
 
-      # Generate and install PKI certificates on each SUT
-      Dir.mktmpdir do |cert_dir|
-        run_fake_pki_ca_on(server, hosts, cert_dir )
-        hosts.each{ |sut| copy_pki_to( sut, cert_dir, '/etc/pki/simp-testing' )}
-      end
-
-      # add PKI keys
-      copy_keydist_to(server)
-    rescue StandardError, ScriptError => e
-      if ENV['PRY']
-        require 'pry'; binding.pry
-      else
-        raise e
-      end
+    # Generate and install PKI certificates on each SUT
+    Dir.mktmpdir do |cert_dir|
+      run_fake_pki_ca_on(server, hosts, cert_dir)
+      hosts.each { |sut| copy_pki_to(sut, cert_dir, '/etc/pki/simp-testing') }
     end
+
+    # add PKI keys
+    copy_keydist_to(server)
+  rescue StandardError, ScriptError => e
+    raise e unless ENV['PRY']
+    require 'pry'
+    binding.pry # rubocop:disable Lint/Debugger
   end
 end
