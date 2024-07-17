@@ -115,23 +115,23 @@ require 'pathname'
 require 'securerandom'
 require 'yaml'
 
+# SimpRpmHelper class
 class SimpRpmHelper
-
-  class ConfigError < StandardError ; end
-  class ComponentError < StandardError ; end
-  class CommandError < StandardError ; end
+  class ConfigError < StandardError; end
+  class ComponentError < StandardError; end
+  class CommandError < StandardError; end
 
   PROGRAM_NAME = File.basename(__FILE__)
-  VERSION = '1.0.0'
+  VERSION = '1.0.0'.freeze
 
-  DEFAULT_CONFIG_FILE = '/etc/simp/adapter_conf.yaml'
-  DEFAULT_BARE_REPOS_DIR = '/usr/share/simp/git/puppet_modules'
-  DEFAULT_WORK_DIR = '/var/lib/simp-adapter'
+  DEFAULT_CONFIG_FILE = '/etc/simp/adapter_conf.yaml'.freeze
+  DEFAULT_BARE_REPOS_DIR = '/usr/share/simp/git/puppet_modules'.freeze
+  DEFAULT_WORK_DIR = '/var/lib/simp-adapter'.freeze
 
   # Git author/committer info used for all Git operations on
   # the created/updated module Git repo
   GIT_AUTHOR = PROGRAM_NAME
-  GIT_EMAIL = ''
+  GIT_EMAIL = ''.freeze
 
   # key is --rpm_section, value is an array whose index corresponds
   # to the integer representation of --rpm_status.  At each index
@@ -153,7 +153,7 @@ class SimpRpmHelper
     'posttrans' => [nil, 'install', 'upgrade'],
     'preun'     => ['erase', 'uninstall previous version during upgrade', nil],
     'postun'    => ['erase', 'uninstall previous version during upgrade', nil]
-  }
+  }.freeze
 
   def initialize
     # simp-adapter RPM requires 'git' and 'rsync' to ensure these commands
@@ -161,10 +161,10 @@ class SimpRpmHelper
     # 'git' and 'rsync' otherwise. So, we have to verify the commands are
     # available.
     @git = Facter::Core::Execution.which('git')
-    fail("#{PROGRAM_NAME} cannot locate 'git' executable") if @git.nil?
+    raise("#{PROGRAM_NAME} cannot locate 'git' executable") if @git.nil?
 
     @rsync = Facter::Core::Execution.which('rsync')
-    fail("#{PROGRAM_NAME} cannot locate 'rsync' executable") if @rsync.nil?
+    raise("#{PROGRAM_NAME} cannot locate 'rsync' executable") if @rsync.nil?
 
     # A list of modules(<author>-<name>) that should never be imported
     # into the SIMP-managed bare repos and the reason each should be skipped.
@@ -174,13 +174,13 @@ class SimpRpmHelper
 
     # Variables to be set during processing
     @options = OpenStruct.new # Merge of command line options, config file
-                              # settings and defaults
+    # settings and defaults
     @module_fullname = nil    # <author>-<name> from metadata.json
     @module_version  = nil    # version from metadata.json
     @target_repo_dir = nil    # module's central (bare) repo to be created/updated
     @repo_created    = false  # whether the repo was created in this operation
     @work_repo_dir   = nil    # temporary clone of the module's central repo; only
-                              # persists upon a git failure for developer debug
+    # persists upon a git failure for developer debug
   end
 
   # Clone the central repo for the component and update its master branch with
@@ -228,7 +228,7 @@ class SimpRpmHelper
           "GIT_COMMITTER_EMAIL='#{GIT_EMAIL}'",
           "#{@git} commit",
           "--author='#{GIT_AUTHOR} <#{GIT_EMAIL}>'",
-          "-m 'Imported version #{@module_version}'"
+          "-m 'Imported version #{@module_version}'",
         ].join(' ')
         execute(commit_cmd, "Failed to add updated content to #{@work_repo_dir}")
 
@@ -272,50 +272,47 @@ class SimpRpmHelper
     debug("Executing: #{cmd}")
     outfile = File.join('/tmp', "#{ENV['USER']}_#{SecureRandom.hex}")
     errfile = File.join('/tmp', "#{ENV['USER']}_#{SecureRandom.hex}")
-    pid = spawn(cmd, :out=>outfile, :err=>errfile)
+    pid = spawn(cmd, out: outfile, err: errfile)
 
     begin
-      pid,status = Process.wait2(pid)
+      _, status = Process.wait2(pid)
     rescue Errno::ECHILD
       # process exited before status could be determined
     end
 
-    exit_status = status.nil? ? nil : status.exitstatus
+    exit_status = status&.exitstatus
 
-    if (exit_status == 0)
-      return { :stdout => IO.read(outfile), :stderr => IO.read(errfile) }
-    else
-      stderr = IO.read(errfile).strip
-      msg = fail_msg.nil? ? '' : "#{fail_msg}:\n"
-      msg += indent("[ #{cmd} ] returned #{exit_status}")
-      unless stderr.empty?
-        msg += ":\n"
-        msg += [ indent(">>>>>>>>>>>>> stderr >>>>>>>>>>>>>"),
-                 indent(stderr),
-                 indent("<<<<<<<<<<<<< stderr <<<<<<<<<<<<<")
-               ].join("\n")
-      end
-      raise SimpRpmHelper::CommandError.new(msg)
+    return { stdout: IO.read(outfile), stderr: IO.read(errfile) } if exit_status == 0
+
+    stderr = IO.read(errfile).strip
+    msg = fail_msg.nil? ? '' : "#{fail_msg}:\n"
+    msg += indent("[ #{cmd} ] returned #{exit_status}")
+    unless stderr.empty?
+      msg += ":\n"
+      msg += [ indent('>>>>>>>>>>>>> stderr >>>>>>>>>>>>>'),
+               indent(stderr),
+               indent('<<<<<<<<<<<<< stderr <<<<<<<<<<<<<')].join("\n")
     end
+    raise SimpRpmHelper::CommandError, msg
   ensure
     if @options.verbose
       msg = []
       msg << "Exit status: #{exit_status}"
-      msg << "-------- stdout --------"
+      msg << '-------- stdout --------'
       stdout = File.read(outfile).strip
       msg << indent(stdout) unless stdout.empty?
-      msg << "------------------------"
-      msg << "-------- stderr --------"
+      msg << '------------------------'
+      msg << '-------- stderr --------'
       stderr = File.read(errfile).strip
       msg << indent(stderr) unless stderr.empty?
-      msg << "------------------------"
+      msg << '------------------------'
       debug(msg.join("\n"))
     end
     FileUtils.rm_f([outfile, errfile])
   end
 
-  def indent(message, indent_length=2)
-    message.split("\n").map {|line| ' '*indent_length + line }.join("\n")
+  def indent(message, indent_length = 2)
+    message.split("\n").map { |line| ' ' * indent_length + line }.join("\n")
   end
 
   # Update the master branch of the module's central Git repo
@@ -343,20 +340,18 @@ class SimpRpmHelper
     metadata_file = File.join(@options.rpm_dir, 'metadata.json')
     if File.exist?(metadata_file)
       begin
-        metadata = JSON.load(File.read(metadata_file))
+        metadata = JSON.parse(File.read(metadata_file))
         @module_fullname = metadata['name']
         @module_version = metadata['version']
-      rescue Exception => e
+      rescue Exception => e # rubocop:disable Lint/RescueException
         error("Invalid file #{metadata_file}:\n#{e}")
       end
     end
 
-    unless @module_fullname && @module_version
-      msg = "Could not extract module information from #{metadata_file}"
-      raise SimpRpmHelper::ComponentError.new(msg)
-    end
+    return if @module_fullname && @module_version
+    msg = "Could not extract module information from #{metadata_file}"
+    raise SimpRpmHelper::ComponentError, msg
   end
-
 
   # Parse and validate command line options
   #
@@ -368,7 +363,7 @@ class SimpRpmHelper
   #        failure
   def parse_options(args)
     # save this off for warning/error messages
-    @cmd_line = "#{$0} #{args.join( ' ' )}"
+    @cmd_line = "#{$PROGRAM_NAME} #{args.join(' ')}"
 
     all_opts = OptionParser.new do |opts|
       opts.banner = "Usage: #{PROGRAM_NAME} -d DIR -s SECTION -S STATUS [options]"
@@ -379,7 +374,7 @@ class SimpRpmHelper
         '--rpm_dir DIR',
         'The fully qualified path to the directory',
         "into which the module's RPM source material",
-        'is installed.'
+        'is installed.',
       ) do |arg|
         @options.rpm_dir = arg.strip
         # Name of module, only.  Does not include the author.
@@ -391,7 +386,7 @@ class SimpRpmHelper
         '--rpm_section SECTION',
         'The section of the RPM from which the',
         "script is being called: 'pre', 'preun'",
-        "'post', 'postun', 'posttrans'"
+        "'post', 'postun', 'posttrans'",
       ) do |arg|
         @options.rpm_section = arg.strip
       end
@@ -411,7 +406,7 @@ class SimpRpmHelper
         '-f CONFIG_FILE',
         '--config CONFIG_FILE',
         'The configuration file overriding defaults.',
-        "    Default: #{DEFAULT_CONFIG_FILE}"
+        "    Default: #{DEFAULT_CONFIG_FILE}",
       ) do |arg|
         @options.config_file = arg.strip
       end
@@ -425,7 +420,7 @@ class SimpRpmHelper
         'using materials found in --rpm_dir.',
         # 2 lines so help message fits into 80 characters
         '    Default:',
-        "    #{DEFAULT_BARE_REPOS_DIR}"
+        "    #{DEFAULT_BARE_REPOS_DIR}",
       ) do |arg|
         @options.target_dir = arg.strip
       end
@@ -435,7 +430,7 @@ class SimpRpmHelper
         '--work_dir DIR',
         'The fully qualified path for a temporary',
         'work directory.',
-        "    Default: #{DEFAULT_WORK_DIR}"
+        "    Default: #{DEFAULT_WORK_DIR}",
       ) do |arg|
         @options.work_dir = arg.strip
       end
@@ -443,14 +438,14 @@ class SimpRpmHelper
       opts.on(
         '-p',
         '--preserve',
-        "DEPRECATED. This option is no longer used."
+        'DEPRECATED. This option is no longer used.',
       ) do |arg|
       end
 
       opts.on(
         '-v',
         '--verbose',
-        'Print out debug info when processing.'
+        'Print out debug info when processing.',
       ) do
         @options.verbose = true
       end
@@ -458,7 +453,7 @@ class SimpRpmHelper
       opts.on(
         '-h',
         '--help',
-        'Help Message'
+        'Help Message',
       ) do
         puts opts
         @options.help_requested = true
@@ -468,7 +463,7 @@ class SimpRpmHelper
     begin
       all_opts.parse!(args)
     rescue OptionParser::ParseError => e
-      raise SimpRpmHelper::ConfigError.new("#{e}\n\n#{all_opts}")
+      raise SimpRpmHelper::ConfigError, "#{e}\n\n#{all_opts}"
     end
 
     validate_options(all_opts.to_s)
@@ -493,8 +488,8 @@ class SimpRpmHelper
     debug("Processing install/version change for #{@module_fullname} #{@module_version}")
     msg = "#{@target_repo_dir} could not be updated to #{@module_version}\n\n"
     msg += "          Manually execute the following to fix:\n\n"
-    msg += "#{@cmd_line.gsub("=post", "=posttrans")}\n\n"
-    raise SimpRpmHelper::ComponentError.new(msg)
+    msg += "#{@cmd_line.gsub('=post', '=posttrans')}\n\n"
+    raise SimpRpmHelper::ComponentError, msg
   end
 
   # Load and validate configuration from a config file and then
@@ -527,19 +522,19 @@ class SimpRpmHelper
         if system_config
           config.merge!(system_config)
         end
-      rescue Exception => e
+      rescue Exception => e # rubocop:disable Lint/RescueException
         msg = "Config file '#{@options.config_file}' could not be processed:\n#{e}"
-        raise SimpRpmHelper::ConfigError.new(msg)
+        raise SimpRpmHelper::ConfigError, msg
       end
     elsif file_expected
       msg = "Config file '#{@options.config_file}' does not exist"
-      raise SimpRpmHelper::ConfigError.new(msg)
+      raise SimpRpmHelper::ConfigError, msg
     end
 
     if @options.target_dir.nil?
       unless config['target_dir'][0].chr == '/'
         msg = "'target_dir' in '#{@options.config_file}' must be an absolute path"
-        raise SimpRpmHelper::ConfigError.new(msg)
+        raise SimpRpmHelper::ConfigError, msg
       end
 
       # clean up any relative sub-paths for tidier logging
@@ -549,7 +544,7 @@ class SimpRpmHelper
     if @options.work_dir.nil?
       unless config['work_dir'][0].chr == '/'
         msg = "'work_dir' in '#{@options.config_file}' must be an absolute path"
-        raise SimpRpmHelper::ConfigError.new(msg)
+        raise SimpRpmHelper::ConfigError, msg
       end
 
       # clean up any relative sub-paths for tidier logging
@@ -566,9 +561,9 @@ class SimpRpmHelper
     skip = false
     if @skip_components.keys.include?(@module_fullname)
       skip = true
-      if (['posttrans', 'post'].include?(@options.rpm_section) &&
-        ['1', '2'].include?(@options.rpm_status)
-      )
+      if ['posttrans', 'post'].include?(@options.rpm_section) &&
+         ['1', '2'].include?(@options.rpm_status)
+
         debug("Skipping repo update for #{@module_fullname}: #{@skip_components[@options.module_name]}")
       else
         debug(noop_msg)
@@ -584,7 +579,7 @@ class SimpRpmHelper
     Dir.chdir(@work_repo_dir) do
       # See if a tag is required
       results = execute("#{@git} tag -l")
-      if results[:stdout].match(/^#{Regexp.escape(@module_version)}$/m)
+      if %r{^#{Regexp.escape(@module_version)}$}m.match?(results[:stdout])
         # make sure tag content is correct
         results = execute("#{@git} diff --name-only tags/#{@module_version} .")
         if results[:stdout].strip.empty?
@@ -610,7 +605,7 @@ class SimpRpmHelper
           "GIT_COMMITTER_EMAIL='#{GIT_EMAIL}'",
           "#{@git} tag -a -f",
           @module_version,
-          "-m '#{tag_msg}'"
+          "-m '#{tag_msg}'",
         ].join(' ')
         execute(tag_cmd, "Failed to create annotated tag in #{@work_repo_dir}")
 
@@ -691,10 +686,10 @@ class SimpRpmHelper
       end
     end
 
-    return 0
+    0
   rescue ConfigError, ComponentError => e
     error(e)
-    return 1
+    1
   rescue CommandError => e
     msg = [ e.message ]
     unless @options.verbose
@@ -705,12 +700,12 @@ class SimpRpmHelper
       msg << ''
     end
     error(msg.join("\n"))
-    return 2
-  rescue Exception => e
+    2
+  rescue Exception => e # rubocop:disable Lint/RescueException
     msg = [ e.message ]
     e.backtrace.first(10).each { |l| msg << " #{l}" }
     error(msg.join("\n"))
-    return 3
+    3
   end
 
   # @returns a 'no operation' message for the configured options
@@ -730,40 +725,40 @@ class SimpRpmHelper
     return if @options.help_requested
 
     unless @options.rpm_dir
-      raise SimpRpmHelper::ConfigError.new("'rpm_dir' is required\n\n#{usage}")
+      raise SimpRpmHelper::ConfigError, "'rpm_dir' is required\n\n#{usage}"
     end
 
     unless @options.rpm_dir[0].chr == '/'
       msg = "'rpm_dir' must be an absolute path"
-      raise SimpRpmHelper::ConfigError.new(msg)
+      raise SimpRpmHelper::ConfigError, msg
     end
     # clean up any relative sub-paths for tidier logging
     @options.rpm_dir = File.expand_path(@options.rpm_dir)
 
     unless @options.rpm_status
-      raise SimpRpmHelper::ConfigError.new("'rpm_status' is required\n\n#{usage}")
+      raise SimpRpmHelper::ConfigError, "'rpm_status' is required\n\n#{usage}"
     end
 
     unless @options.rpm_section
-      raise SimpRpmHelper::ConfigError.new("'rpm_section' is required\n\n#{usage}")
+      raise SimpRpmHelper::ConfigError, "'rpm_section' is required\n\n#{usage}"
     end
 
     valid_rpm_sections = ['pre', 'post', 'preun', 'postun', 'posttrans']
     unless valid_rpm_sections.include?(@options.rpm_section)
       msg = "'rpm_section' must be one of '#{valid_rpm_sections.join("', '")}'\n\n#{usage}"
-      raise SimpRpmHelper::ConfigError.new(msg)
+      raise SimpRpmHelper::ConfigError, msg
     end
 
     if (@options.rpm_section == 'posttrans') || (@options.rpm_section == 'preun')
       unless File.directory?(@options.rpm_dir)
         msg = "Could not find 'rpm_dir': '#{@options.rpm_dir}'"
-        raise SimpRpmHelper::ConfigError.new(msg)
+        raise SimpRpmHelper::ConfigError, msg
       end
     end
 
-    unless @options.rpm_status =~ /^\d+$/
+    unless %r{^\d+$}.match?(@options.rpm_status)
       msg = "'rpm_status' must be an integer: '#{@options.rpm_status}'"
-      raise SimpRpmHelper::ConfigError.new(msg)
+      raise SimpRpmHelper::ConfigError, msg
     end
 
     if @options.target_dir
@@ -773,18 +768,15 @@ class SimpRpmHelper
       @options.target_dir = File.expand_path(@options.target_dir)
     end
 
-    if @options.work_dir
-      unless @options.work_dir.chr == '/'
-        msg = "'work_dir' must be an absolute path"
-        raise SimpRpmHelper::ConfigError.new(msg)
-      end
-
-      # clean up any relative sub-paths for tidier logging
-      @options.work_dir = File.expand_path(@options.work_dir)
+    return unless @options.work_dir
+    unless @options.work_dir.chr == '/'
+      msg = "'work_dir' must be an absolute path"
+      raise SimpRpmHelper::ConfigError, msg
     end
 
+    # clean up any relative sub-paths for tidier logging
+    @options.work_dir = File.expand_path(@options.work_dir)
   end
-
 
   ##############################################################################
   # Log helpers
@@ -817,8 +809,7 @@ end
 
 ################################################################################
 
-if __FILE__ == $0
+if __FILE__ == $PROGRAM_NAME
   helper = SimpRpmHelper.new
   exit helper.run(ARGV)
 end
-

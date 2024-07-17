@@ -13,7 +13,6 @@ end
 
 unless upgrade_hosts.empty?
   describe 'simp-adapter upgrade operations' do
-
     let(:old_adapter_config_file) { '/etc/simp/adapter_config.yaml' }
     let(:new_adapter_config_file) { '/etc/simp/adapter_conf.yaml' }
 
@@ -41,14 +40,14 @@ unless upgrade_hosts.empty?
     upgrade_hosts.each do |host|
       context "Upgrading simp-adapter from version <= 0.1.1 on #{host.hostname}" do
         before :each do
-           step '[prep] Revert to old version of simp-adapter'
-           host.uninstall_package('simp-adapter')
-           host.uninstall_package('puppet-agent')
-           host.install_package('simp-adapter-0.1.1')
+          step '[prep] Revert to old version of simp-adapter'
+          host.uninstall_package('simp-adapter')
+          host.uninstall_package('puppet-agent')
+          host.install_package('simp-adapter-0.1.1')
         end
 
         context 'When old adapter config has local modifications' do
-          it 'should remove old, modified adapter config' do
+          it 'removes old, modified adapter config' do
             old_config = {
               'target_directory' => '/usr/share/simp/modules',
               'copy_rpm_data'    => true
@@ -61,7 +60,7 @@ unless upgrade_hosts.empty?
             # verify old config has been removed, but new config remains
             on(host, "ls -l #{File.dirname(old_adapter_config_file)}")
             on(host, "ls #{new_adapter_config_file}")
-            on(host, "ls #{old_adapter_config_file}*", :acceptable_exit_codes => [2])
+            on(host, "ls #{old_adapter_config_file}*", acceptable_exit_codes: [2])
           end
         end
       end
