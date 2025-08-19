@@ -225,21 +225,21 @@ variables:
 #-----------------------------------------------------------------------
 
 .pup_6_x: &pup_6_x
-  image: 'ruby:2.5'
+  image: 'ruby:3.4'
   variables:
     PUPPET_VERSION: '~> 6.0'
     BEAKER_PUPPET_COLLECTION: 'puppet6'
     MATRIX_RUBY_VERSION: '2.5'
 
 .pup_6_pe: &pup_6_pe
-  image: 'ruby:2.5'
+  image: 'ruby:3.4'
   variables:
     PUPPET_VERSION: '6.22.1'
     BEAKER_PUPPET_COLLECTION: 'puppet6'
     MATRIX_RUBY_VERSION: '2.5'
 
 .pup_7_x: &pup_7_x
-  image: 'ruby:2.7'
+  image: 'ruby:3.4'
   variables:
     PUPPET_VERSION: '~> 7.0'
     BEAKER_PUPPET_COLLECTION: 'puppet7'
@@ -266,7 +266,7 @@ variables:
     - 'bundle exec rake spec'
 
 .beaker: &beaker
-  image: ruby:2.7.2  # must be 2.7.2 if running in GCP
+  image: ruby:3.4.5  # must be 2.7.2 if running in GCP
   tags:
     - beaker
   before_script:
