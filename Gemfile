@@ -4,7 +4,7 @@ gem_sources.each { |gem_source| source gem_source }
 
 group :test do
   gem 'hiera-puppet-helper'
-  gem 'pathspec', '~> 0.2' if Gem::Requirement.create('< 2.6').satisfied_by?(Gem::Version.new(RUBY_VERSION.dup))
+  gem 'pathspec', '~> 2.0' if Gem::Requirement.create('< 2.6').satisfied_by?(Gem::Version.new(RUBY_VERSION.dup))
   gem 'puppet', ENV.fetch('PUPPET_VERSION',  ['>= 7', '< 9'])
   gem 'puppetlabs_spec_helper'
   gem 'rake'
