@@ -23,7 +23,7 @@ stages:
   - 'compliance'
   - 'deployment'
 
-image: 'ruby:2.4'
+image: 'ruby:2.7'
 
 variables:
   PUPPET_VERSION:    'UNDEFINED' # <- Matrixed jobs MUST override this (or fail)
@@ -70,33 +70,33 @@ variables:
 #-----------------------------------------------------------------------
 
 .pup_4: &pup_4
-  image: 'ruby:2.4'
+  image: 'ruby:2.7'
   variables:
     PUPPET_VERSION: '~> 4.0'
     MATRIX_RUBY_VERSION: '2.1'
 
 .pup_4_10: &pup_4_10
-  image: 'ruby:2.1'
+  image: 'ruby:2.7'
   variables:
     PUPPET_VERSION: '~> 4.10.4'
     MATRIX_RUBY_VERSION: '2.1'
 
 .pup_5: &pup_5
-  image: 'ruby:2.4'
+  image: 'ruby:2.7'
   variables:
     PUPPET_VERSION: '~> 5.0'
     BEAKER_PUPPET_COLLECTION: 'puppet5'
     MATRIX_RUBY_VERSION: '2.4'
 
 .pup_5_3: &pup_5_3
-  image: 'ruby:2.4'
+  image: 'ruby:2.7'
   variables:
     PUPPET_VERSION: '~> 5.3.0'
     BEAKER_PUPPET_COLLECTION: 'puppet5'
     MATRIX_RUBY_VERSION: '2.4'
 
 .pup_5_5_7: &pup_5_5_7
-  image: 'ruby:2.4'
+  image: 'ruby:2.7'
   variables:
     PUPPET_VERSION: '5.5.7'
     BEAKER_PUPPET_COLLECTION: 'puppet5'
@@ -104,7 +104,7 @@ variables:
 
 .pup_6: &pup_6
   allow_failure: true
-  image: 'ruby:2.5'
+  image: 'ruby:2.7'
   variables:
     PUPPET_VERSION: '~> 6.0'
     BEAKER_PUPPET_COLLECTION: 'puppet6'
