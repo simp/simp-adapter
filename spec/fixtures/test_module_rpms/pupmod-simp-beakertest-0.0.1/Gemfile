@@ -13,7 +13,7 @@ gem_sources.each { |gem_source| source gem_source }
 group :test do
   gem "rake"
   gem 'puppet', puppetversion
-  gem "rspec", '< 3.2.0'
+  gem "rspec", '< 3.13.2'
   gem "rspec-puppet"
   gem "hiera-puppet-helper"
   gem "puppetlabs_spec_helper"
