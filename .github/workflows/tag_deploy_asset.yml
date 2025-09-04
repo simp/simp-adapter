@@ -33,7 +33,7 @@ jobs:
   releng-checks:
     name: "RELENG checks"
     if: github.repository_owner == 'simp'
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-24.04
     steps:
       - name: "Assert '${{ github.ref }}' is a tag"
         run: '[[ "$GITHUB_REF" =~ ^refs/tags/ ]] || { echo "::error ::GITHUB_REF is not a tag: ${GITHUB_REF}"; exit 1 ; }'
@@ -55,7 +55,7 @@ jobs:
     name: Deploy GitHub Release
     needs: [ releng-checks ]
     if: github.repository_owner == 'simp'
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
