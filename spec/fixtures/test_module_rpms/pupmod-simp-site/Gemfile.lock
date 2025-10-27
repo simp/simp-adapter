@@ -149,7 +149,7 @@ GEM
     puppet-lint (2.3.6)
     puppet-lint-empty_string-check (0.2.2)
       puppet-lint (>= 1.0, < 3.0)
-    puppet-lint-trailing_comma-check (0.4.2)
+    puppet-lint-trailing_comma-check (0.4.3)
       puppet-lint (>= 1.0, < 3.0)
     puppet-strings (2.1.0)
       rgen
