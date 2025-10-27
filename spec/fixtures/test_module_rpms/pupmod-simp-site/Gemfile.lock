@@ -68,7 +68,7 @@ GEM
     domain_name (0.5.20180417)
       unf (>= 0.0.5, < 1.0.0)
     excon (0.62.0)
-    facter (2.5.1)
+    facter (2.5.7)
     facterdb (0.6.0)
       facter
       jgrep
@@ -96,7 +96,7 @@ GEM
     json (1.8.6)
     json-schema (2.8.1)
       addressable (>= 2.4)
-    locale (2.1.2)
+    locale (2.1.4)
     log4r (1.1.10)
     metaclass (0.0.4)
     metadata-json-lint (2.2.0)
@@ -137,7 +137,7 @@ GEM
       pry (~> 0.11)
       yard (~> 0.9.11)
     public_suffix (3.0.3)
-    puppet (5.5.10)
+    puppet (5.5.22)
       facter (> 2.0.1, < 4)
       fast_gettext (~> 1.1.2)
       hiera (>= 3.2.1, < 4)
