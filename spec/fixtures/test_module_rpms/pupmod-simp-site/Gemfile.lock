@@ -147,7 +147,7 @@ GEM
       puppet-lint (>= 1.0, < 3.0)
     puppet-lint-trailing_comma-check (0.4.3)
       puppet-lint (>= 1.0, < 3.0)
-    puppet-strings (2.1.0)
+    puppet-strings (2.9.0)
       rgen
       yard (~> 0.9.5)
     puppet-syntax (2.4.3)
@@ -178,7 +178,7 @@ GEM
       mime-types (>= 1.16, < 3.0)
       netrc (~> 0.7)
     rexml (3.4.4)
-    rgen (0.8.2)
+    rgen (0.10.2)
     rspec (3.13.2)
       rspec-core (~> 3.13.0)
       rspec-expectations (~> 3.13.0)
@@ -251,7 +251,7 @@ GEM
     unf (0.1.4)
       unf_ext
     unf_ext (0.0.7.5)
-    yard (0.9.18)
+    yard (0.9.37)
 
 PLATFORMS
   ruby
