@@ -69,7 +69,7 @@ GEM
       unf (>= 0.0.5, < 1.0.0)
     excon (0.62.0)
     facter (2.5.7)
-    facterdb (0.6.0)
+    facterdb (0.8.2)
       facter
       jgrep
     faraday (0.13.1)
@@ -92,7 +92,7 @@ GEM
       domain_name (~> 0.5)
     in-parallel (0.1.17)
     inifile (3.0.0)
-    jgrep (1.5.0)
+    jgrep (1.5.4)
     json (1.8.6)
     json-schema (2.8.1)
       addressable (>= 2.4)
