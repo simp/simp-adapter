@@ -7,8 +7,11 @@ test_name 'simp-adapter upgrade operations'
 
 # This test requires an old version of the simp-adapter which is only
 # available in a legacy repo that supports EL < 8.
-upgrade_hosts = hosts.select do |host|
-  fact_on(host, 'os.release.major').to_s < '8'
+def upgrade_hosts
+  return @upgrade_hosts unless @upgrade_hosts.nil?
+  @upgrade_hosts = hosts.select do |host|
+    fact_on(host, 'os.release.major').to_s < '8'
+  end
 end
 
 unless upgrade_hosts.empty?

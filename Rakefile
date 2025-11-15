@@ -1,5 +1,3 @@
-#!/usr/bin/rake -T
-
 require 'rspec/core/rake_task'
 require 'rake/clean'
 require 'rake/packagetask'
