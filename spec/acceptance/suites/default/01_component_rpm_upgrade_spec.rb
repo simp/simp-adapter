@@ -10,10 +10,21 @@ test_name 'simp-adapter in RPM upgrade/downgrade'
 # Both RPMs have simp_rpm_helper in %posttrans and empty spec/fixtures/simp_rspec/
 # directories.
 #
-version1 = '0.0.2'
-version2 = '0.0.3'
-package1 = "pupmod-simp-beakertest-#{version1}"
-package2 = "pupmod-simp-beakertest-#{version2}"
+def version1
+  '0.0.2'
+end
+
+def version2
+  '0.0.3'
+end
+
+def package1
+  "pupmod-simp-beakertest-#{version1}"
+end
+
+def package2
+  "pupmod-simp-beakertest-#{version2}"
+end
 
 describe 'simp-adapter in RPM upgrade/downgrade' do
   hosts.each do |host|
