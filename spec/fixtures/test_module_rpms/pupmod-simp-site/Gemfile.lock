@@ -5,7 +5,7 @@ GEM
       public_suffix (>= 2.0.2, < 7.0)
     ast (2.4.3)
     base64 (0.3.0)
-    bcrypt_pbkdf (1.1.1)
+    bcrypt_pbkdf (1.1.2)
     beaker (7.2.1)
       base64 (>= 0.2.0, < 1)
       bcrypt_pbkdf (>= 1.0, < 2.0)
