@@ -102,7 +102,7 @@ GEM
     inifile (3.0.0)
     io-console (0.8.1)
     jgrep (1.5.4)
-    json (2.16.0)
+    json (2.19.2)
     json-schema (5.2.2)
       addressable (~> 2.8)
       bigdecimal (~> 3.1)
@@ -165,7 +165,7 @@ GEM
     parallel (1.27.0)
     parallel_tests (5.5.0)
       parallel
-    parser (3.3.10.0)
+    parser (3.3.10.2)
       ast (~> 2.4.1)
       racc
     pastel (0.8.0)
@@ -190,7 +190,7 @@ GEM
     prime (0.1.4)
       forwardable
       singleton
-    prism (1.6.0)
+    prism (1.9.0)
     pry (0.15.2)
       coderay (~> 1.1)
       method_source (~> 1.0)
@@ -293,7 +293,7 @@ GEM
       openfact (~> 5.0)
     rspec-support (3.13.6)
     rsync (1.0.9)
-    rubocop (1.81.7)
+    rubocop (1.86.0)
       json (~> 2.3)
       language_server-protocol (~> 3.17.0.2)
       lint_roller (~> 1.1.0)
@@ -301,12 +301,12 @@ GEM
       parser (>= 3.3.0.2)
       rainbow (>= 2.2.2, < 4.0)
       regexp_parser (>= 2.9.3, < 3.0)
-      rubocop-ast (>= 1.47.1, < 2.0)
+      rubocop-ast (>= 1.49.0, < 2.0)
       ruby-progressbar (~> 1.7)
       unicode-display_width (>= 2.4.0, < 4.0)
-    rubocop-ast (1.48.0)
+    rubocop-ast (1.49.1)
       parser (>= 3.3.7.2)
-      prism (~> 1.4)
+      prism (~> 1.7)
     rubocop-performance (1.26.1)
       lint_roller (~> 1.1)
       rubocop (>= 1.75.0, < 2.0)
@@ -386,7 +386,7 @@ GEM
     tty-which (0.5.0)
     unicode-display_width (3.2.0)
       unicode-emoji (~> 4.1)
-    unicode-emoji (4.1.0)
+    unicode-emoji (4.2.0)
     uri (1.1.1)
     wisper (2.0.1)
     yard (0.9.37)
@@ -411,7 +411,7 @@ DEPENDENCIES
   rake
   rspec
   rspec-puppet
-  rubocop (~> 1.81.0)
+  rubocop (~> 1.86.0)
   rubocop-performance (~> 1.26.0)
   rubocop-rake (~> 0.7.0)
   rubocop-rspec (~> 3.8.0)
