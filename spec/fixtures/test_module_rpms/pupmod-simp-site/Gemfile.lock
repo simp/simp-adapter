@@ -197,9 +197,9 @@ GEM
     pry-byebug (3.11.0)
       byebug (~> 12.0)
       pry (>= 0.13, < 0.16)
-    pry-doc (1.6.0)
+    pry-doc (1.7.0)
       pry (~> 0.11)
-      yard (~> 0.9.11)
+      yard (~> 0.9.21)
     public_suffix (6.0.2)
     puppet (8.10.0)
       concurrent-ruby (~> 1.0)
@@ -389,7 +389,7 @@ GEM
     unicode-emoji (4.2.0)
     uri (1.1.1)
     wisper (2.0.1)
-    yard (0.9.37)
+    yard (0.9.41)
 
 PLATFORMS
   x86_64-linux
