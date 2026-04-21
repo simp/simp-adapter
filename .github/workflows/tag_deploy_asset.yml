@@ -65,7 +65,7 @@ jobs:
           fetch-depth: 0
 
       - name: Build Release RPM
-        uses: simp/github-action-build-and-sign-pkg-single-rpm@v1
+        uses: simp/github-action-build-and-sign-pkg-single-rpm@2.4.1
         id: build-and-sign-rpm
         with:
           gpg_signing_key: ${{ secrets.SIMP_DEV_GPG_SIGNING_KEY }}
