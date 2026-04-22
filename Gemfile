@@ -26,7 +26,7 @@ group :syntax do
   gem 'rubocop', '~> 1.86.0', require: false
   gem 'rubocop-performance', '~> 1.26.0', require: false
   gem 'rubocop-rake', '~> 0.7.0', require: false
-  gem 'rubocop-rspec', '~> 3.8.0', require: false
+  gem 'rubocop-rspec', '~> 3.9.0', require: false
 end
 
 group :system_tests do
