@@ -311,7 +311,7 @@ describe 'simp-adapter' do
           result = on(host, "yum install -y pupmod-simp-beakertest-#{bad_module_version}")
 
           # verify user told how to fix
-          expect(result.stdout).to match(%r{Manually execute the following to fix:})
+          expect(result.stdout).to include('Manually execute the following to fix:')
           expect(result.stdout).to match(%r{#{Regexp.escape(install_fix_cmd)}})
         end
 
