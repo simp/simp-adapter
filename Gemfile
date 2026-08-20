@@ -7,7 +7,7 @@ group :test do
   gem 'pathspec', '~> 0.2' if Gem::Requirement.create('< 2.6').satisfied_by?(Gem::Version.new(RUBY_VERSION.dup))
   # renovate: datasource=rubygems versioning=ruby
   gem 'puppet', ENV.fetch('PUPPET_VERSION',  ['>= 7', '< 9'])
-  gem 'puppetlabs_spec_helper', '~> 8.0.0'
+  gem 'puppetlabs_spec_helper', '~> 9.0.0'
   gem 'rake'
   gem 'rspec'
   gem 'rspec-puppet'
