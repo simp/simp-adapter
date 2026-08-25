@@ -74,8 +74,9 @@ populate Puppet module environments.
 
       `/usr/share/simp/git/puppet_modules/<owner>-<name>.git`
 
-  - Updates the master branch of the repository to be the contents
-    of the RPM, excluding any empty directories
+  - Updates the default branch of the repository (`master` for
+    repositories `simp_rpm_helper` creates) to be the contents of the
+    RPM, excluding any empty directories
   - Adds a Git tag to the repository that matches the version number
     in the module's `metadata.json` file, as necessary
 
@@ -117,7 +118,8 @@ Below are a few other details about `simp_rpm_helper` that are worth noting:
   (`rubygem-simp-cli` package). Execute `simp help` for more information.
 * `simp_rpm_helper` will not create a Git repository for `pupmod-simp-site`
   package, as this package is no longer used beginning with SIMP 6.4.0.
-* The `master` branch of a local Puppet module Git repository will contain
+* The default branch (`master`, unless the repository was created by
+  other means) of a local Puppet module Git repository will contain
   a local transaction history for the RPM of that module, ***not*** a
   copy of the Git history in the public repository for that project.
   Regardless, you should always use a tagged version from a local module

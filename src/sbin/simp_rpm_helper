@@ -29,8 +29,9 @@
 #
 #       `/usr/share/simp/git/puppet_modules/<owner>-<name>.git`
 #
-#   - Updates the master branch of the repository to be the contents
-#     of the RPM, excluding any empty directories
+#   - Updates the default branch of the repository ('master' for
+#     repositories this script creates) to be the contents of the RPM,
+#     excluding any empty directories
 #   - Adds a Git tag to the repository that matches the version number
 #     in the module's `metadata.json` file, as necessary
 #
@@ -94,7 +95,8 @@
 #   (`rubygem-simp-cli` package). Execute `simp help` for more information.
 # * `simp_rpm_helper` will not create a Git repository for `pupmod-simp-site`
 #   package, as this package is no longer used beginning with SIMP 6.4.0.
-# * The `master` branch of a local Puppet module Git repository will contain
+# * The default branch (`master`, unless the repository was created by
+#   other means) of a local Puppet module Git repository will contain
 #   a local transaction history for the RPM of that module, ***NOT*** a
 #   copy of the Git history in the public repository for that project.
 #   Regardless, you should always use a tagged version from a local module
@@ -178,18 +180,19 @@ class SimpRpmHelper
     @module_fullname = nil    # <author>-<name> from metadata.json
     @module_version  = nil    # version from metadata.json
     @target_repo_dir = nil    # module's central (bare) repo to be created/updated
+    @default_branch  = nil    # default branch of the module's central repo
     @repo_created    = false  # whether the repo was created in this operation
     @work_repo_dir   = nil    # temporary clone of the module's central repo; only
     # persists upon a git failure for developer debug
   end
 
-  # Clone the central repo for the component and update its master branch with
-  # the content in the RPM dir
+  # Clone the central repo for the component and update its default branch
+  # with the content in the RPM dir
   #
   # @raises SimpRpmHelper::CommandError if any git operation fails
   def clone_and_update
     # minimize the # of times we spew out the entire path to the git repo
-    repo = @repo_created ? 'master branch' : @target_repo_dir + ' master branch'
+    repo = @repo_created ? "#{@default_branch} branch" : "#{@target_repo_dir} #{@default_branch} branch"
     debug("Updating #{repo} with version #{@module_version}")
 
     debug("Cloning #{@target_repo_dir} to #{@work_repo_dir}")
@@ -201,10 +204,11 @@ class SimpRpmHelper
 
     Dir.chdir(@work_repo_dir) do
       # When the central repo is empty (initial install), the name of the
-      # unborn branch in the clone comes from the local init.defaultBranch
-      # setting, which may not be 'master' on modern git.  Pin it explicitly.
-      execute("#{@git} symbolic-ref HEAD refs/heads/master",
-        "Failed to set branch to master in #{@work_repo_dir}")
+      # unborn branch in the clone can come from the local init.defaultBranch
+      # setting instead of the central repo's HEAD.  Pin it explicitly to the
+      # central repo's default branch.
+      execute("#{@git} symbolic-ref HEAD refs/heads/#{@default_branch}",
+        "Failed to set branch to #{@default_branch} in #{@work_repo_dir}")
 
       debug("Updating #{@work_repo_dir} with files from #{@options.rpm_dir}")
       # clean out directory for an easy update
@@ -217,13 +221,13 @@ class SimpRpmHelper
       copy_cmd += %( #{@options.rpm_dir}/ #{@work_repo_dir})
       execute(copy_cmd, "Failed to update clone at #{@work_repo_dir}")
 
-      # double check a commit is required, because if the master branch
+      # double check a commit is required, because if the default branch
       # already matches what we have, the commit will fail
       results = execute("#{@git} status --porcelain")
       if results[:stdout].strip.empty?
-        debug("Update of #{@target_repo_dir} master for #{@module_version} unnecessary")
+        debug("Update of #{@target_repo_dir} #{@default_branch} for #{@module_version} unnecessary")
       else
-        debug("Updating master branch of #{@target_repo_dir}")
+        debug("Updating #{@default_branch} branch of #{@target_repo_dir}")
         # -f option is required for files in spec/fixtures that don't play
         # well with the .gitignore file (if packaged in the RPM)
         execute("#{@git} add -f --all .",
@@ -238,8 +242,8 @@ class SimpRpmHelper
         ].join(' ')
         execute(commit_cmd, "Failed to add updated content to #{@work_repo_dir}")
 
-        execute("#{@git} push origin master",
-          "Failed to push updated content to master at #{@target_repo_dir}")
+        execute("#{@git} push origin #{@default_branch}",
+          "Failed to push updated content to #{@default_branch} at #{@target_repo_dir}")
       end
     end
   end
@@ -254,9 +258,11 @@ class SimpRpmHelper
     execute("#{@git} init --bare #{@target_repo_dir}",
       "Failed to create git repo at #{@target_repo_dir}")
 
-    # Ensure HEAD points at 'master' regardless of the git version's or
-    # system's init.defaultBranch setting, since all other operations
-    # (commits, pushes, r10k checkouts) assume a 'master' branch.
+    # Pin HEAD to 'master' regardless of the git version's or system's
+    # init.defaultBranch setting, so that repos created by this script have
+    # a consistent, documented default branch name across all hosts.  (A
+    # pre-existing repo with a different default branch is honored via
+    # default_branch.)
     execute("#{@git} --git-dir=#{@target_repo_dir} symbolic-ref HEAD refs/heads/master",
       "Failed to set default branch to master in #{@target_repo_dir}")
 
@@ -327,7 +333,22 @@ class SimpRpmHelper
     message.split("\n").map { |line| ' ' * indent_length + line }.join("\n")
   end
 
-  # Update the master branch of the module's central Git repo
+  # Determine the default branch of the module's central Git repo from its
+  # HEAD reference
+  #
+  # Falls back to 'master' (the branch name this script has always used)
+  # if HEAD cannot be resolved to a branch name.
+  #
+  # @returns the name of the central repo's default branch
+  def default_branch
+    results = execute("#{@git} --git-dir=#{@target_repo_dir} symbolic-ref --short HEAD")
+    branch = results[:stdout].strip
+    branch.empty? ? 'master' : branch
+  rescue SimpRpmHelper::CommandError
+    'master'
+  end
+
+  # Update the default branch of the module's central Git repo
   # with the contents in /usr/share/simp/modules/<module name> and
   # then create a tag for that version.
   #
@@ -338,6 +359,7 @@ class SimpRpmHelper
     debug("Processing install/version change for #{@module_fullname} #{@module_version}")
 
     create_central_repo unless Dir.exist?(@target_repo_dir)
+    @default_branch = default_branch
     clone_and_update
     tag_version
     debug('Repo update completed.')
@@ -609,7 +631,7 @@ class SimpRpmHelper
         # different content.  If the user munged a SIMP-generated tag, the git
         # reference for the munged version should still be available on the
         # branch the version was created from.  This is true even for the
-        # master branch, as we never force push to master.
+        # default branch, as we never force push to it.
         debug("Tagging version #{@module_version}")
         tag_msg = "Version #{@module_version} tagged by #{PROGRAM_NAME} #{VERSION}"
         tag_cmd = [

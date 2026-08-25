@@ -96,9 +96,10 @@ fi
   - Accept openvox-agent as an alternative to puppet-agent, using RPM
     boolean dependencies (supported on EL8+)
   - Drop EL7 support
-- Fix simp_rpm_helper to explicitly create and push the 'master' branch
-  instead of relying on git's init.defaultBranch, which defaults to
-  'main' on newer git releases
+- Fix simp_rpm_helper handling of git's init.defaultBranch, which is
+  'main' on newer git releases: repos it creates are now pinned to
+  'master' regardless of the local git configuration, and updates use
+  the existing repo's default branch instead of assuming 'master'
 - Modernize the test and release tooling (Ruby 3.2-4.0, the openvox gem,
   simp-rake-helpers 6, simp-beaker-helpers 3, EL8/9/10 nodesets)
 
