@@ -3,7 +3,6 @@ require 'rake/clean'
 require 'rake/packagetask'
 require 'simp/rake'
 require 'simp/rake/beaker'
-require 'simp/rake/ci'
 
 # coverage/ contains SimpleCov results
 CLEAN.include 'coverage'
@@ -19,6 +18,3 @@ Simp::Rake::Pkg.new(File.dirname(__FILE__))
 
 # Acceptance Tests
 Simp::Rake::Beaker.new(File.dirname(__FILE__))
-
-# simp:ci_* Rake tasks
-Simp::Rake::Ci.new(File.dirname(__FILE__))
