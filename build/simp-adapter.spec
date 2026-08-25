@@ -1,6 +1,6 @@
 Summary: SIMP Adapter
 Name: simp-adapter
-Version: 2.2.0
+Version: 2.3.0
 Release: 1%{?dist}
 License: Apache-2.0
 Group: Applications/System
@@ -11,22 +11,17 @@ Buildarch: noarch
 Prefix: %{_sysconfdir}/simp
 
 # simp_rpm_helper uses git and rsync.
-%if 0%{?rhel} > 7
-# On el > 7, dnf will, by default, also remove the packages for these
-# executables when the simp-adapter is uninstalled, if they are not required
-# by any other packages.  So, use weak dependencies known to the package
-# manager. See rpm.org/user_doc/dependencies.html.
+#
+# dnf will, by default, also remove the packages for these executables when
+# the simp-adapter is uninstalled, if they are not required by any other
+# packages.  So, use weak dependencies known to the package manager.
+# See rpm.org/user_doc/dependencies.html.
 Recommends: git
 Recommends: rsync
-Recommends: puppet-agent >= 7.20.0
-%else
-Requires: git
-Requires: rsync
-Requires: puppet-agent >= 7.20.0
-%endif
+Recommends: (openvox-agent >= 8 or puppet-agent >= 7.20.0)
 
 # %postun uses /opt/puppetlabs/puppet/bin/ruby
-Requires(postun): puppet-agent
+Requires(postun): (openvox-agent or puppet-agent)
 
 Provides: simp-adapter = %{version}
 Provides: simp-adapter-foss = %{version}
@@ -96,6 +91,17 @@ if [ -f "/etc/simp/adapter_config.yaml.rpmsave" ]; then
 fi
 
 %changelog
+* Tue Aug 25 2026 Steven Pritchard <steve@sicura.us> - 2.3.0
+- Support OpenVox
+  - Accept openvox-agent as an alternative to puppet-agent, using RPM
+    boolean dependencies (supported on EL8+)
+  - Drop EL7 support
+- Fix simp_rpm_helper to explicitly create and push the 'master' branch
+  instead of relying on git's init.defaultBranch, which defaults to
+  'main' on newer git releases
+- Modernize the test and release tooling (Ruby 3.2-4.0, the openvox gem,
+  simp-rake-helpers 6, simp-beaker-helpers 3, EL8/9/10 nodesets)
+
 * Tue Jul 16 2024 Steven Pritchard <steve@sicura.us> - 2.2.0
 - Updates for Puppet 8
   - Fixes for Ruby 3

@@ -200,6 +200,12 @@ class SimpRpmHelper
       "Failed to clone #{@target_repo_dir}")
 
     Dir.chdir(@work_repo_dir) do
+      # When the central repo is empty (initial install), the name of the
+      # unborn branch in the clone comes from the local init.defaultBranch
+      # setting, which may not be 'master' on modern git.  Pin it explicitly.
+      execute("#{@git} symbolic-ref HEAD refs/heads/master",
+        "Failed to set branch to master in #{@work_repo_dir}")
+
       debug("Updating #{@work_repo_dir} with files from #{@options.rpm_dir}")
       # clean out directory for an easy update
       entries = Dir.entries(@work_repo_dir)
@@ -247,6 +253,12 @@ class SimpRpmHelper
 
     execute("#{@git} init --bare #{@target_repo_dir}",
       "Failed to create git repo at #{@target_repo_dir}")
+
+    # Ensure HEAD points at 'master' regardless of the git version's or
+    # system's init.defaultBranch setting, since all other operations
+    # (commits, pushes, r10k checkouts) assume a 'master' branch.
+    execute("#{@git} --git-dir=#{@target_repo_dir} symbolic-ref HEAD refs/heads/master",
+      "Failed to set default branch to master in #{@target_repo_dir}")
 
     # Ideally, the Git repo we just created should be accessible to all.
     # However, we should **only** adjust permissions to the parent
