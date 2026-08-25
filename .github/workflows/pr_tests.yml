@@ -2,13 +2,13 @@
 #
 # ==============================================================================
 #
-# The testing matrix considers ruby/puppet versions supported by SIMP and PE:
+# The testing matrix considers ruby/puppet versions supported by SIMP:
 # ------------------------------------------------------------------------------
-# Release       Puppet   Ruby    EOL
-# PE 2021.Y     7.x      2.7     Quarterly updates
+# Release      Gem        Ruby
+# OpenVox 8    openvox 8  3.2, 3.4
+# OpenVox 9*   openvox 8  4.0     (*unreleased; previewed with the OpenVox 8 gem)
 #
-# https://puppet.com/docs/pe/latest/component_versions_in_recent_pe_releases.html
-# https://puppet.com/misc/puppet-enterprise-lifecycle
+# https://voxpupuli.org/openvox/
 # ==============================================================================
 #
 # https://docs.github.com/en/actions/reference/events-that-trigger-workflows
@@ -26,24 +26,25 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v7
-      - name: "Install Ruby ${{matrix.puppet.ruby_version}}"
+      - name: 'Install Ruby 4.0'
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.4.9
+          ruby-version: 4.0.6
           bundler-cache: true
       - name: 'Run rubocop'
         run: |
           bundle show
           bundle exec rubocop
+
   releng-checks:
     name: 'RELENG checks'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: 'Install Ruby ${{matrix.puppet.ruby_version}}'
+      - name: 'Install Ruby 4.0'
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.4.9
+          ruby-version: 4.0.6
           bundler-cache: true
       - run: 'command -v rpm || if command -v apt-get; then sudo apt-get update; sudo apt-get install -y rpm; fi ||:'
       - name: 'Tags and changelogs'
@@ -53,17 +54,26 @@ jobs:
           bundle exec rake pkg:create_tag_changelog
 
   spec-tests:
-    name: 'Puppet Spec'
+    name: 'Spec'
     runs-on: ubuntu-latest
     strategy:
       matrix:
         puppet:
-          - label: 'Puppet 7.x'
-            puppet_version: '~> 7.0'
-            ruby_version: '2.7'
-          - label: 'Puppet 8.x'
+          - label: 'OpenVox 8.x (Ruby 3.2)'
             puppet_version: '~> 8.0'
             ruby_version: '3.2'
+            experimental: false
+          - label: 'OpenVox 8.x (Ruby 3.4)'
+            puppet_version: '~> 8.0'
+            ruby_version: '3.4'
+            experimental: false
+          # OpenVox 9 is unreleased; preview the future Ruby 4.0 / OpenVox 9
+          # combo by running the OpenVox 8 gem on Ruby 4.0.
+          - label: 'OpenVox 9.x preview (Ruby 4.0, OpenVox 8 gem)'
+            puppet_version: '~> 8.0'
+            ruby_version: '4.0'
+            experimental: false
+      fail-fast: false
     env:
       PUPPET_VERSION: '${{matrix.puppet.puppet_version}}'
     steps:
@@ -73,16 +83,7 @@ jobs:
         with:
           ruby-version: ${{matrix.puppet.ruby_version}}
           bundler-cache: true
-      # unit test uses rsync
+      # unit tests use git and rsync
       - run: 'command -v rsync || if command -v apt-get; then sudo apt-get update; sudo apt-get install -y rsync; fi ||:'
       - run: 'bundle exec rake spec'
-
-#  dump_contexts:
-#    name: 'Examine Context contents'
-#    runs-on: ubuntu-16.04
-#    steps:
-#      - name: Dump contexts
-#        env:
-#          GITHUB_CONTEXT: ${{ toJson(github) }}
-#        run: echo "$GITHUB_CONTEXT"
-#
+        continue-on-error: ${{matrix.puppet.experimental}}

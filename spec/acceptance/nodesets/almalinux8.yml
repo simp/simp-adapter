@@ -1,16 +1,18 @@
 ---
 HOSTS:
-  centos-8-x64:
+  server-almalinux8.simp.beaker:
     roles:
       - default
       - server
     platform: el-8-x86_64
-    box: generic/centos8
+    box: almalinux/8
     hypervisor: "<%= ENV.fetch('BEAKER_HYPERVISOR', 'vagrant') %>"
-    family: centos-cloud/centos-stream-8
+    vagrant_memsize: 2048
+    vagrant_cpus: 2
+    family: almalinux-cloud/almalinux-8
     gce_machine_type: n1-standard-2
 CONFIG:
   log_level: verbose
   type: aio
   synced_folder: disabled
-  puppet_collection: "<%= ENV.fetch('BEAKER_PUPPET_COLLECTION', 'puppet7') %>"
+  puppet_collection: "<%= ENV.fetch('BEAKER_PUPPET_COLLECTION', 'openvox8') %>"

@@ -240,6 +240,55 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
         expect(File).to exist(module_repo_dir)
         expect(File).to exist(override_work_dir)
       end
+
+      it "pins new central repos to 'master' regardless of init.defaultBranch" do
+        config = {
+          'target_dir' => File.join(tmp_dir, 'repos'),
+          'work_dir'   => File.join(tmp_dir, 'work_dir')
+        }
+        config_file = File.join(tmp_dir, 'adapter_conf.yaml')
+        File.open(config_file, 'w') { |file| file.puts config.to_yaml }
+
+        args = ['-d', module_src_dir, '-s', 'posttrans', '-S', '1', '-f', config_file]
+        ENV['GIT_CONFIG_COUNT'] = '1'
+        ENV['GIT_CONFIG_KEY_0'] = 'init.defaultBranch'
+        ENV['GIT_CONFIG_VALUE_0'] = 'main'
+        begin
+          expect(helper.run(args)).to eq(0)
+        ensure
+          ENV.delete('GIT_CONFIG_COUNT')
+          ENV.delete('GIT_CONFIG_KEY_0')
+          ENV.delete('GIT_CONFIG_VALUE_0')
+        end
+
+        module_repo_dir = File.join(config['target_dir'], 'simp-beakertest.git')
+        head = `git --git-dir=#{module_repo_dir} symbolic-ref --short HEAD`.strip
+        expect(head).to eq('master')
+        expect(`git --git-dir=#{module_repo_dir} log --oneline master`).to match(%r{Imported version})
+      end
+
+      it 'updates the default branch of a pre-existing central repo' do
+        config = {
+          'target_dir' => File.join(tmp_dir, 'repos'),
+          'work_dir'   => File.join(tmp_dir, 'work_dir')
+        }
+        config_file = File.join(tmp_dir, 'adapter_conf.yaml')
+        File.open(config_file, 'w') { |file| file.puts config.to_yaml }
+
+        # simulate a central repo created by other means with a 'main'
+        # default branch
+        module_repo_dir = File.join(config['target_dir'], 'simp-beakertest.git')
+        FileUtils.mkdir_p(config['target_dir'])
+        `git init --bare #{module_repo_dir}`
+        `git --git-dir=#{module_repo_dir} symbolic-ref HEAD refs/heads/main`
+
+        args = ['-d', module_src_dir, '-s', 'posttrans', '-S', '1', '-f', config_file]
+        expect(helper.run(args)).to eq(0)
+
+        head = `git --git-dir=#{module_repo_dir} symbolic-ref --short HEAD`.strip
+        expect(head).to eq('main')
+        expect(`git --git-dir=#{module_repo_dir} log --oneline main`).to match(%r{Imported version})
+      end
     end
 
     context 'missing required commands' do
