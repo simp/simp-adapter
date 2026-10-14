@@ -26,7 +26,7 @@ group :syntax do
   # voxpupuli-test (via simp-rake-helpers); pinning them here conflicts with its
   # constraints. rubocop-performance is not a voxpupuli-test dependency, so it
   # stays explicit.
-  gem 'rubocop-performance', '~> 1.26.0', require: false
+  gem 'rubocop-performance', '~> 1.27.0', require: false
 end
 
 group :system_tests do

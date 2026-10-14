@@ -264,7 +264,7 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
         module_repo_dir = File.join(config['target_dir'], 'simp-beakertest.git')
         head = `git --git-dir=#{module_repo_dir} symbolic-ref --short HEAD`.strip
         expect(head).to eq('master')
-        expect(`git --git-dir=#{module_repo_dir} log --oneline master`).to match(%r{Imported version})
+        expect(`git --git-dir=#{module_repo_dir} log --oneline master`).to include('Imported version')
       end
 
       it 'updates the default branch of a pre-existing central repo' do
@@ -287,7 +287,7 @@ Usage: #{script} -d DIR -s SECTION -S STATUS [options]
 
         head = `git --git-dir=#{module_repo_dir} symbolic-ref --short HEAD`.strip
         expect(head).to eq('main')
-        expect(`git --git-dir=#{module_repo_dir} log --oneline main`).to match(%r{Imported version})
+        expect(`git --git-dir=#{module_repo_dir} log --oneline main`).to include('Imported version')
       end
     end
 
